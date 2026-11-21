@@ -382,6 +382,11 @@ button {
   color: var(--expense);
 }
 
+.badge-pending {
+  background: oklch(0.93 0.08 75);
+  color: oklch(0.42 0.15 65);
+}
+
 .income-text {
   color: var(--income);
 }
@@ -395,15 +400,28 @@ button {
 .offline-banner {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 0.625rem 1rem;
   background: color-mix(in oklab, var(--destructive) 10%, var(--card));
   border-bottom: 1px solid color-mix(in oklab, var(--destructive) 25%, var(--border));
   color: var(--destructive);
   font-size: 0.875rem;
   font-weight: 550;
-  text-align: center;
+}
+
+.offline-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.offline-sync-btn {
+  height: 2.25rem;
+  font-size: 0.8125rem;
+  padding: 0 0.75rem;
+  background: var(--card);
 }
 
 /* ---------- Login ---------- */
@@ -463,6 +481,33 @@ button {
   padding-bottom: 0.5rem;
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--primary);
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+}
+
+.sync-badge:hover {
+  background: color-mix(in oklab, var(--primary) 10%, var(--card));
+}
+
+.sync-spinning {
+  animation: sync-spin 0.9s linear infinite;
+}
+
+@keyframes sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .app-main {
   display: grid;
   gap: 1rem;
@@ -495,6 +540,31 @@ button {
 }
 
 /* ---------- Filters ---------- */
+
+.filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.filter-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filter-preset-btn {
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  font-size: 0.8125rem;
+  border-radius: 9999px;
+}
+
+.filter-preset-btn.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
 
 .filter-grid {
   display: grid;
@@ -573,6 +643,306 @@ button {
   border-radius: inherit;
   background: var(--primary);
   transition: width 220ms ease;
+}
+
+/* ---------- Target Anggaran (Budgeting) ---------- */
+
+.budget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.budget-summary-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+}
+
+.budget-summary-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+
+.budget-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .budget-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.budget-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.budget-card:hover {
+  border-color: color-mix(in oklab, var(--border) 60%, var(--primary));
+}
+
+.budget-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.budget-card-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-card-status {
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.budget-status-normal {
+  background: color-mix(in oklab, var(--income) 15%, var(--card));
+  color: var(--income);
+}
+
+.budget-status-warning {
+  background: oklch(0.92 0.09 75);
+  color: oklch(0.42 0.16 65);
+}
+
+.budget-status-exceeded {
+  background: color-mix(in oklab, var(--destructive) 15%, var(--card));
+  color: var(--destructive);
+}
+
+.budget-bar-normal {
+  background: var(--income);
+}
+
+.budget-bar-warning {
+  background: oklch(0.68 0.18 65);
+}
+
+.budget-bar-exceeded {
+  background: var(--destructive);
+}
+
+.budget-card-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.budget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.75rem 1rem;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 0.9375rem;
+}
+
+.budget-rows-container {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.budget-row-item {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ---------- Visualisasi & Analisis Grafik (Charts) ---------- */
+
+.charts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chart-tab-group {
+  display: flex;
+  gap: 0.375rem;
+  background: var(--muted);
+  padding: 0.25rem;
+  border-radius: var(--radius);
+}
+
+.chart-tab {
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  font-size: 0.8125rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: none;
+}
+
+.chart-tab.active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chart-svg-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  display: block;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 500;
+}
+
+.chart-legend-color {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.2rem;
+  flex-shrink: 0;
+}
+
+.donut-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: center;
+  justify-items: center;
+}
+
+@media (min-width: 640px) {
+  .donut-layout {
+    grid-template-columns: 260px 1fr;
+    justify-items: start;
+  }
+}
+
+.donut-legend {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 480px) and (max-width: 639px) {
+  .donut-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.donut-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+
+.donut-legend-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.donut-legend-name {
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut-legend-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.chart-bar {
+  transition: opacity 120ms ease, transform 120ms ease;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  opacity: 0.85;
+}
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 0.9375rem;
 }
 
 /* ---------- Transactions ---------- */
@@ -863,3 +1233,46 @@ button {
     animation: none;
   }
 }
+
+/* ---------- Dark mode theme ---------- */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.16 0.005 240);
+    --foreground: oklch(0.96 0.002 240);
+    --card: oklch(0.20 0.006 240);
+    --card-foreground: oklch(0.96 0.002 240);
+    --primary: oklch(0.55 0.12 180);
+    --primary-hover: oklch(0.60 0.12 180);
+    --primary-foreground: oklch(0.12 0.005 240);
+    --secondary: oklch(0.26 0.008 240);
+    --secondary-foreground: oklch(0.92 0.004 240);
+    --muted: oklch(0.24 0.006 240);
+    --muted-foreground: oklch(0.65 0.01 240);
+    --accent: oklch(0.26 0.008 240);
+    --accent-foreground: oklch(0.92 0.004 240);
+    --destructive: oklch(0.60 0.22 27);
+    --destructive-hover: oklch(0.65 0.22 27);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.28 0.008 240);
+    --input: oklch(0.30 0.008 240);
+    --ring: oklch(0.60 0.12 180);
+    --income: oklch(0.62 0.16 160);
+    --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4);
+    --shadow-pop: 0 20px 45px rgb(0 0 0 / 0.6);
+  }
+
+  .dialog::backdrop {
+    background: rgb(0 0 0 / 0.72);
+  }
+
+  .budget-status-warning {
+    background: oklch(0.30 0.08 75);
+    color: oklch(0.88 0.12 75);
+  }
+
+  .budget-summary-box {
+    background: var(--secondary);
+  }
+}
+

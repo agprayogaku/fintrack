@@ -15,7 +15,7 @@
 </head>
 <body>
 
-  <!-- Inline icon sprite: project-owned SVGs, no icon dependency. -->
+  <!-- Inline icon sprite: project-owned SVGs, zero external dependency. -->
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
     <symbol id="i-wallet" viewBox="0 0 24 24">
       <path d="M20 7H5a2 2 0 0 1 0-4h14a1 1 0 0 1 1 1v3"/>
@@ -50,14 +50,38 @@
       <path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 2 2V2l-2 2-3-2-3 2-3-2-3 2Z"/>
       <path d="M8 9h8M8 13h5"/>
     </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/>
+      <circle cx="12" cy="12" r="6"/>
+      <circle cx="12" cy="12" r="2"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+      <path d="M3 3v18h18"/>
+      <path d="M18 17V9"/>
+      <path d="M13 17V5"/>
+      <path d="M8 17v-3"/>
+    </symbol>
+    <symbol id="i-donut" viewBox="0 0 24 24">
+      <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+      <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+    </symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24">
+      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+    </symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 24 24">
+      <path d="m2 2 20 20M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.954-.442M21.774 16.24A4.5 4.5 0 0 0 16.5 10c-.722 0-1.4.11-2.035.313M9.932 4.244A7 7 0 0 1 16 10"/>
+    </symbol>
   </svg>
 
   <div id="offline-banner" class="offline-banner" role="status" hidden>
-    <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
-    <span>Anda sedang offline. Data memerlukan koneksi internet.</span>
+    <div class="offline-banner-content">
+      <svg class="icon" aria-hidden="true"><use href="#i-cloud-off"></use></svg>
+      <span id="offline-banner-text">Mode offline. Data disimpan secara lokal di perangkat Anda.</span>
+    </div>
+    <button class="btn btn-outline btn-sm offline-sync-btn" id="banner-sync-btn" type="button" hidden>Sinkronkan sekarang</button>
   </div>
 
-  <!-- Login -->
+  <!-- Login View -->
   <section id="login-view" class="auth-view">
     <div class="card auth-card">
       <div class="brand auth-brand">
@@ -97,7 +121,7 @@
     </div>
   </section>
 
-  <!-- App -->
+  <!-- App View -->
   <div id="app-view" hidden>
     <header class="app-header">
       <div class="container app-header-inner">
@@ -108,10 +132,16 @@
             <p class="brand-subtitle" id="current-user">Keuangan Pribadi</p>
           </div>
         </div>
-        <button class="btn btn-outline btn-sm" id="logout-button" type="button">
-          <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
-          <span>Keluar</span>
-        </button>
+        <div class="app-header-actions">
+          <button class="btn btn-outline btn-sm sync-badge" id="sync-button" type="button" hidden title="Sinkronkan data ke server">
+            <svg class="icon sync-icon" aria-hidden="true"><use href="#i-sync"></use></svg>
+            <span id="sync-button-text">Sinkronkan</span>
+          </button>
+          <button class="btn btn-outline btn-sm" id="logout-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+            <span>Keluar</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -122,6 +152,7 @@
         <button class="btn btn-outline btn-sm" id="retry-button" type="button">Coba lagi</button>
       </div>
 
+      <!-- Ringkasan Keuangan -->
       <section class="summary-grid" aria-label="Ringkasan keuangan">
         <article class="card summary-card">
           <p class="summary-label">Total pemasukan</p>
@@ -137,33 +168,85 @@
         </article>
       </section>
 
+      <!-- Target Anggaran Bulanan -->
+      <section class="card" aria-labelledby="budget-heading" id="budget-section">
+        <div class="card-header budget-header">
+          <div>
+            <h2 class="card-title" id="budget-heading">Target Anggaran Bulanan</h2>
+            <p class="card-description" id="budget-month-desc">Bulan ini</p>
+          </div>
+          <button class="btn btn-outline btn-sm" id="manage-budget-btn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg>
+            <span>Atur Anggaran</span>
+          </button>
+        </div>
+        <div class="card-content" id="budget-content">
+          <!-- Populated dynamically: budget overview + category items -->
+        </div>
+      </section>
+
+      <!-- Visualisasi & Analisis Grafik -->
+      <section class="card" aria-labelledby="charts-heading" id="charts-section">
+        <div class="card-header charts-header">
+          <div>
+            <h2 class="card-title" id="charts-heading">Visualisasi & Tren</h2>
+            <p class="card-description" id="charts-desc">Grafik tren 6 bulan dan proporsi pengeluaran</p>
+          </div>
+          <div class="chart-tab-group" role="tablist" aria-label="Pilihan grafik visualisasi">
+            <button class="btn btn-sm btn-secondary chart-tab active" id="tab-chart-trend" type="button" role="tab" aria-selected="true">
+              <svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>
+              <span>Tren 6 Bulan</span>
+            </button>
+            <button class="btn btn-sm btn-outline chart-tab" id="tab-chart-donut" type="button" role="tab" aria-selected="false">
+              <svg class="icon" aria-hidden="true"><use href="#i-donut"></use></svg>
+              <span>Porsi Pengeluaran</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-content" id="chart-content">
+          <!-- Rendered dynamically: Pure SVG bar or donut chart -->
+        </div>
+      </section>
+
+      <!-- Filter Transaksi -->
       <section class="card" aria-labelledby="filter-heading">
         <div class="card-header">
           <h2 class="card-title" id="filter-heading">Filter</h2>
           <p class="card-description" id="summary-scope">Semua transaksi</p>
         </div>
-        <form id="filter-form" class="card-content filter-grid" novalidate>
-          <div class="field">
-            <label class="label" for="filter-from">Dari tanggal</label>
-            <input class="input" id="filter-from" name="from" type="date">
+        <div class="card-content filter-container">
+          <!-- Quick Range Presets -->
+          <div class="filter-presets" role="group" aria-label="Pilihan rentang cepat">
+            <button type="button" class="btn btn-sm btn-secondary filter-preset-btn active" data-range="all">Semua</button>
+            <button type="button" class="btn btn-sm btn-outline filter-preset-btn" data-range="this-month">Bulan ini</button>
+            <button type="button" class="btn btn-sm btn-outline filter-preset-btn" data-range="last-month">Bulan lalu</button>
+            <button type="button" class="btn btn-sm btn-outline filter-preset-btn" data-range="30-days">30 hari terakhir</button>
           </div>
-          <div class="field">
-            <label class="label" for="filter-to">Sampai tanggal</label>
-            <input class="input" id="filter-to" name="to" type="date">
-          </div>
-          <div class="field">
-            <label class="label" for="filter-category">Kategori</label>
-            <select class="input select" id="filter-category" name="category">
-              <option value="">Semua kategori</option>
-            </select>
-          </div>
-          <div class="field filter-actions">
-            <button class="btn btn-outline" id="clear-filters" type="button">Hapus filter</button>
-          </div>
-          <p id="filter-error" class="field-error" role="alert" hidden></p>
-        </form>
+
+          <form id="filter-form" class="filter-grid" novalidate>
+            <div class="field">
+              <label class="label" for="filter-from">Dari tanggal</label>
+              <input class="input" id="filter-from" name="from" type="date">
+            </div>
+            <div class="field">
+              <label class="label" for="filter-to">Sampai tanggal</label>
+              <input class="input" id="filter-to" name="to" type="date">
+            </div>
+            <div class="field">
+              <label class="label" for="filter-category">Kategori</label>
+              <select class="input select" id="filter-category" name="category">
+                <option value="">Semua kategori</option>
+              </select>
+            </div>
+            <div class="field filter-actions">
+              <button class="btn btn-outline" id="clear-filters" type="button">Hapus filter</button>
+            </div>
+            <p id="filter-error" class="field-error" role="alert" hidden></p>
+          </form>
+        </div>
       </section>
 
+      <!-- Breakdown Berdasarkan Kategori -->
       <section class="card" aria-labelledby="category-heading">
         <div class="card-header">
           <h2 class="card-title" id="category-heading">Berdasarkan kategori</h2>
@@ -171,6 +254,7 @@
         <div class="card-content" id="category-list"></div>
       </section>
 
+      <!-- Daftar Transaksi -->
       <section class="card" aria-labelledby="txn-heading" id="txn-section">
         <div class="card-header txn-header">
           <div>
@@ -283,6 +367,43 @@
         <button class="btn btn-destructive" id="delete-confirm" type="button">Hapus</button>
       </div>
     </div>
+  </dialog>
+
+  <!-- Budget settings dialog -->
+  <dialog id="budget-dialog" class="dialog" aria-labelledby="budget-dialog-title">
+    <form id="budget-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 class="dialog-title" id="budget-dialog-title">Atur Target Anggaran</h2>
+          <p class="dialog-description">Tentukan batas pengeluaran bulanan per kategori.</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" type="button" data-close-dialog aria-label="Tutup">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="dialog-body form-stack">
+        <p class="field-description">Target anggaran berlaku untuk total pengeluaran per bulan kalender. Masukkan angka bulat (Rp), atau kosongkan / isi 0 untuk menonaktifkan.</p>
+        <div id="budget-rows-container" class="form-stack budget-rows-container">
+          <!-- Populated dynamically with category fields -->
+        </div>
+        <div>
+          <button class="btn btn-outline btn-sm" id="budget-add-row-btn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+            <span>Tambah Kategori Lain</span>
+          </button>
+        </div>
+        <div id="budget-form-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="budget-form-error-text"></span>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-outline" type="button" data-close-dialog>Batal</button>
+        <button class="btn btn-primary" id="budget-submit" type="submit">Simpan Anggaran</button>
+      </div>
+    </form>
   </dialog>
 
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
