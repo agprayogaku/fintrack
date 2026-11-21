@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FinTrack — Keuangan Pribadi</title>
+  <meta name="description" content="Pelacak keuangan pribadi dalam Rupiah. Catat pemasukan dan pengeluaran dengan aman.">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FinTrack">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+
+  <!-- Inline icon sprite: project-owned SVGs, no icon dependency. -->
+  <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="i-wallet" viewBox="0 0 24 24">
+      <path d="M20 7H5a2 2 0 0 1 0-4h14a1 1 0 0 1 1 1v3"/>
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+      <path d="M21 11h-4a2 2 0 0 0 0 4h4a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1Z"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"/>
+    </symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+    </symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="M18 6 6 18M6 6l12 12"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 8v4M12 16h.01"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M20 6 9 17l-5-5"/>
+    </symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24">
+      <path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 2 2V2l-2 2-3-2-3 2-3-2-3 2Z"/>
+      <path d="M8 9h8M8 13h5"/>
+    </symbol>
+  </svg>
+
+  <div id="offline-banner" class="offline-banner" role="status" hidden>
+    <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+    <span>Anda sedang offline. Data memerlukan koneksi internet.</span>
+  </div>
+
+  <!-- Login -->
+  <section id="login-view" class="auth-view">
+    <div class="card auth-card">
+      <div class="brand auth-brand">
+        <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg></span>
+        <div>
+          <p class="brand-name">FinTrack</p>
+          <p class="brand-subtitle">Keuangan Pribadi</p>
+        </div>
+      </div>
+
+      <div class="card-header">
+        <h1 class="card-title">Masuk</h1>
+        <p class="card-description">Masuk ke akun Anda untuk mengelola keuangan pribadi.</p>
+      </div>
+
+      <form id="login-form" class="card-content form-stack" novalidate>
+        <div class="field">
+          <label class="label" for="login-username">Nama pengguna</label>
+          <input class="input" id="login-username" name="username" type="text" autocomplete="username"
+                 autocapitalize="none" spellcheck="false" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="login-password">Kata sandi</label>
+          <input class="input" id="login-password" name="password" type="password"
+                 autocomplete="current-password" required>
+        </div>
+
+        <div id="login-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="login-error-text"></span>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="login-submit" type="submit">Masuk</button>
+        <p class="field-description">Gunakan akun yang dibuat oleh administrator.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- App -->
+  <div id="app-view" hidden>
+    <header class="app-header">
+      <div class="container app-header-inner">
+        <div class="brand">
+          <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg></span>
+          <div>
+            <p class="brand-name">FinTrack</p>
+            <p class="brand-subtitle" id="current-user">Keuangan Pribadi</p>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="logout-button" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+          <span>Keluar</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="container app-main">
+      <div id="app-error" class="alert alert-destructive" role="alert" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <span id="app-error-text"></span>
+        <button class="btn btn-outline btn-sm" id="retry-button" type="button">Coba lagi</button>
+      </div>
+
+      <section class="summary-grid" aria-label="Ringkasan keuangan">
+        <article class="card summary-card">
+          <p class="summary-label">Total pemasukan</p>
+          <p class="summary-value income-text" id="summary-income">Rp 0</p>
+        </article>
+        <article class="card summary-card">
+          <p class="summary-label">Total pengeluaran</p>
+          <p class="summary-value expense-text" id="summary-expense">Rp 0</p>
+        </article>
+        <article class="card summary-card">
+          <p class="summary-label">Saldo bersih</p>
+          <p class="summary-value" id="summary-net">Rp 0</p>
+        </article>
+      </section>
+
+      <section class="card" aria-labelledby="filter-heading">
+        <div class="card-header">
+          <h2 class="card-title" id="filter-heading">Filter</h2>
+          <p class="card-description" id="summary-scope">Semua transaksi</p>
+        </div>
+        <form id="filter-form" class="card-content filter-grid" novalidate>
+          <div class="field">
+            <label class="label" for="filter-from">Dari tanggal</label>
+            <input class="input" id="filter-from" name="from" type="date">
+          </div>
+          <div class="field">
+            <label class="label" for="filter-to">Sampai tanggal</label>
+            <input class="input" id="filter-to" name="to" type="date">
+          </div>
+          <div class="field">
+            <label class="label" for="filter-category">Kategori</label>
+            <select class="input select" id="filter-category" name="category">
+              <option value="">Semua kategori</option>
+            </select>
+          </div>
+          <div class="field filter-actions">
+            <button class="btn btn-outline" id="clear-filters" type="button">Hapus filter</button>
+          </div>
+          <p id="filter-error" class="field-error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="category-heading">
+        <div class="card-header">
+          <h2 class="card-title" id="category-heading">Berdasarkan kategori</h2>
+        </div>
+        <div class="card-content" id="category-list"></div>
+      </section>
+
+      <section class="card" aria-labelledby="txn-heading" id="txn-section">
+        <div class="card-header txn-header">
+          <div>
+            <h2 class="card-title" id="txn-heading">Transaksi</h2>
+            <p class="card-description" id="txn-count"></p>
+          </div>
+          <button class="btn btn-primary" id="add-button" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+            <span>Tambah</span>
+          </button>
+        </div>
+
+        <div class="card-content">
+          <div id="txn-loading" class="skeleton-list" aria-hidden="true" hidden>
+            <div class="skeleton skeleton-row"></div>
+            <div class="skeleton skeleton-row"></div>
+            <div class="skeleton skeleton-row"></div>
+          </div>
+
+          <div id="txn-empty" class="empty-state" hidden>
+            <svg class="icon icon-lg" aria-hidden="true"><use href="#i-receipt"></use></svg>
+            <p id="txn-empty-text">Belum ada transaksi.</p>
+            <button class="btn btn-primary btn-sm" id="empty-add-button" type="button">Tambah transaksi</button>
+          </div>
+
+          <ul id="txn-list" class="txn-list"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Add / edit dialog -->
+  <dialog id="txn-dialog" class="dialog" aria-labelledby="txn-dialog-title">
+    <form id="txn-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 class="dialog-title" id="txn-dialog-title">Tambah transaksi</h2>
+          <p class="dialog-description" id="txn-dialog-description">Catat pemasukan atau pengeluaran baru.</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" type="button" data-close-dialog aria-label="Tutup">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="dialog-body form-stack">
+        <div class="field">
+          <label class="label" for="txn-type">Jenis</label>
+          <select class="input select" id="txn-type" name="type" required>
+            <option value="expense">Pengeluaran</option>
+            <option value="income">Pemasukan</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="txn-date">Tanggal</label>
+          <input class="input" id="txn-date" name="date" type="date" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="txn-description">Deskripsi</label>
+          <input class="input" id="txn-description" name="description" type="text"
+                 maxlength="120" placeholder="Contoh: Makan siang" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="txn-category">Kategori</label>
+          <input class="input" id="txn-category" name="category" type="text"
+                 maxlength="40" list="category-suggestions" placeholder="Contoh: Makanan" required>
+          <datalist id="category-suggestions"></datalist>
+        </div>
+
+        <div class="field">
+          <label class="label" for="txn-amount">Jumlah (Rp)</label>
+          <input class="input" id="txn-amount" name="amount" type="number"
+                 inputmode="numeric" min="1" step="1" placeholder="10000" required>
+          <p class="field-description">Gunakan angka bulat tanpa titik atau koma.</p>
+        </div>
+
+        <div id="txn-form-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="txn-form-error-text"></span>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-outline" type="button" data-close-dialog>Batal</button>
+        <button class="btn btn-primary" id="txn-submit" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Delete dialog -->
+  <dialog id="delete-dialog" class="dialog" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <h2 class="dialog-title" id="delete-title">Hapus transaksi?</h2>
+          <p class="dialog-description" id="delete-description">Tindakan ini tidak dapat dibatalkan.</p>
+        </div>
+      </div>
+      <div class="dialog-body">
+        <p class="delete-target" id="delete-target"></p>
+        <div id="delete-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="delete-error-text"></span>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-outline" id="delete-cancel" type="button">Batal</button>
+        <button class="btn btn-destructive" id="delete-confirm" type="button">Hapus</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
