@@ -60,6 +60,18 @@ function getSheet_(name) {
 }
 
 /**
+ * Jalankan fungsi ini dari dropdown editor Apps Script untuk membuat akun pertama Anda.
+ * Ubah 'admin' dan 'kataSandiKuat123' di bawah ini sesuai keinginan Anda sebelum mengklik "Jalankan".
+ */
+function buatAkunAwal() {
+  const username = 'admin';              // 3–64 karakter: huruf, angka, titik (.), strip (-), atau underscore (_)
+  const password = 'kataSandiKuat123';   // Minimal 8 karakter
+  const hasil = createUser(username, password);
+  Logger.log(hasil);
+  return hasil;
+}
+
+/**
  * Run this once from the Apps Script editor to create an account.
  * Delete any temporary wrapper function afterwards.
  */
