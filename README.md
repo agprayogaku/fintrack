@@ -56,20 +56,19 @@ fintrack/
 
 1. Buka [Google Sheets](https://sheets.new) di Google Drive Anda, buat spreadsheet baru dengan nama **FinTrack**.
 2. Buka menu **Ekstensi** > **Apps Script**.
-3. Hapus kode bawaan di editor, lalu salin seluruh isi berkas [`Code.gs`](Code.gs).
-4. Pilih fungsi `setup` di dropdown editor, lalu klik tombol **Jalankan (Run)**. Berikan izin akses Google ketika diminta.
-5. Buat akun pertama Anda dengan menambahkan fungsi sementara di bagian bawah editor:
-   ```javascript
-   function buatAkunSaya() {
-     createUser("username_anda", "kata_sandi_minimal_8_karakter");
-   }
-   ```
-   Pilih `buatAkunSaya` dan klik **Jalankan**. Setelah selesai, Anda dapat menghapus fungsi sementara tersebut.
-6. Klik **Terapkan (Deploy)** > **Penerapan Baru (New deployment)**:
+3. Hapus kode bawaan di editor, lalu salin seluruh isi berkas [`Code.gs`](Code.gs) dan simpan (`Ctrl + S`).
+4. Klik **Terapkan (Deploy)** > **Penerapan Baru (New deployment)**:
    - Pilih jenis: **Aplikasi Web (Web app)**.
    - Jalankan sebagai (*Execute as*): **Saya (Me)**.
    - Yang memiliki akses (*Who has access*): **Siapa saja (Anyone)**.
    - Klik **Terapkan (Deploy)** dan salin URL Web App (`https://script.google.com/macros/s/.../exec`).
+5. Muat ulang (*refresh*) halaman Google Sheets Anda di browser. Anda akan melihat menu kustom baru bernama **"FinTrack"** di toolbar atas (di sebelah menu *Bantuan / Help*).
+6. Di menu Google Sheets tersebut, Anda dapat langsung:
+   - Klik **FinTrack > ⚙️ Setup / Periksa Lembar Sheet** untuk menyiapkan lembar `Users` dan `Transactions`.
+   - Klik **FinTrack > 👤 Tambah Pengguna Baru** untuk membuat akun pengguna baru melalui pop-up interaktif (tanpa perlu menyentuh kode sama sekali!).
+   - Mengelola kata sandi atau melihat daftar pengguna kapan saja.
+
+> **💡 Catatan Penting:** Menambah pengguna, mereset kata sandi, atau mengubah status pengguna melalui menu Spreadsheet ini **TIDAK memerlukan deployment baru**! Data langsung tersimpan di lembar sheet dan dapat digunakan saat itu juga.
 
 ### 2. Hubungkan Frontend ke Backend
 

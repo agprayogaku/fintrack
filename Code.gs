@@ -1,7 +1,10 @@
 /**
  * FinTrack — Google Apps Script backend.
  *
- * Spreadsheet-bound script. Run setup() once, then createUser() from the editor.
+ * Spreadsheet-bound script.
+ * Gunakan menu kustom "FinTrack" di toolbar Google Sheets untuk setup & kelola akun
+ * secara interaktif tanpa perlu menyentuh kode.
+ *
  * Deploy as a web app: Execute as "Me", access "Anyone".
  */
 
@@ -14,6 +17,259 @@ const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const SESSION_EXPIRED_MESSAGE = 'Sesi berakhir. Silakan masuk kembali.';
 const GENERIC_LOGIN_ERROR = 'Nama pengguna atau kata sandi salah.';
 const GENERIC_SERVER_ERROR = 'Terjadi kesalahan server. Silakan coba lagi.';
+
+/* ---------- Menu Interaktif Spreadsheet ---------- */
+
+/**
+ * Otomatis menambahkan menu "FinTrack" saat spreadsheet dibuka.
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('FinTrack')
+    .addItem('👤 Tambah Pengguna Baru', 'menuTambahPengguna')
+    .addItem('🔑 Reset Kata Sandi Pengguna', 'menuResetPassword')
+    .addItem('🔄 Aktif / Nonaktifkan Pengguna', 'menuToggleStatusPengguna')
+    .addItem('📋 Lihat Daftar Pengguna', 'menuLihatPengguna')
+    .addSeparator()
+    .addItem('⚙️ Setup / Periksa Lembar Sheet', 'menuSetup')
+    .addItem('ℹ️ Status & Petunjuk Deployment', 'menuPetunjukDeployment')
+    .addItem('🧪 Jalankan Self-Tests', 'menuJalankanSelfTests')
+    .addToUi();
+}
+
+/**
+ * Dialog interaktif untuk menambahkan pengguna baru langsung dari spreadsheet.
+ */
+function menuTambahPengguna() {
+  const ui = SpreadsheetApp.getUi();
+
+  const respUser = ui.prompt(
+    'Tambah Pengguna FinTrack',
+    'Masukkan nama pengguna (3–64 karakter, tanpa spasi):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (respUser.getSelectedButton() !== ui.Button.OK) return;
+  const username = respUser.getResponseText().trim();
+
+  if (!username) {
+    ui.alert('Peringatan', 'Nama pengguna tidak boleh kosong.', ui.ButtonSet.OK);
+    return;
+  }
+
+  if (/\s/.test(username)) {
+    ui.alert(
+      'Format Tidak Valid',
+      'Nama pengguna tidak boleh mengandung spasi.\nGunakan huruf kecil, angka, titik (.), strip (-), atau underscore (_).',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  const respPass = ui.prompt(
+    'Tambah Pengguna FinTrack',
+    'Masukkan kata sandi untuk "' + username + '" (minimal 8 karakter):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (respPass.getSelectedButton() !== ui.Button.OK) return;
+  const password = respPass.getResponseText();
+
+  if (!password || password.length < 8) {
+    ui.alert('Peringatan', 'Kata sandi minimal harus 8 karakter.', ui.ButtonSet.OK);
+    return;
+  }
+
+  try {
+    const hasil = createUser(username, password);
+    ui.alert(
+      'Berhasil 🎉',
+      hasil + '\n\nPengguna sekarang dapat langsung login di aplikasi FinTrack tanpa perlu membuat deployment baru!',
+      ui.ButtonSet.OK
+    );
+  } catch (error) {
+    ui.alert('Gagal', error.message || 'Terjadi kesalahan saat membuat pengguna.', ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Dialog interaktif untuk mereset kata sandi pengguna langsung dari spreadsheet.
+ */
+function menuResetPassword() {
+  const ui = SpreadsheetApp.getUi();
+
+  const respUser = ui.prompt(
+    'Reset Kata Sandi Pengguna',
+    'Masukkan nama pengguna yang ingin direset:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (respUser.getSelectedButton() !== ui.Button.OK) return;
+  const username = respUser.getResponseText().trim().toLowerCase();
+
+  if (!username) return;
+
+  const sheet = getSheet_(SHEET_USERS);
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, USERS_HEADERS.length).getValues() : [];
+
+  let rowIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][1] || '').trim().toLowerCase() === username) {
+      rowIndex = i + 2;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    ui.alert('Tidak Ditemukan', 'Pengguna "' + username + '" tidak ditemukan di lembar Users.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const respPass = ui.prompt(
+    'Reset Kata Sandi Pengguna',
+    'Masukkan kata sandi baru untuk "' + username + '" (minimal 8 karakter):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (respPass.getSelectedButton() !== ui.Button.OK) return;
+  const newPassword = respPass.getResponseText();
+
+  if (!newPassword || newPassword.length < 8 || newPassword.length > 128) {
+    ui.alert('Peringatan', 'Kata sandi baru harus 8–128 karakter.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const newSalt = Utilities.getUuid();
+  const newHash = hashPassword_(newPassword, newSalt);
+
+  sheet.getRange(rowIndex, 3).setValue(newSalt);
+  sheet.getRange(rowIndex, 4).setValue(newHash);
+
+  ui.alert('Berhasil', 'Kata sandi untuk pengguna "' + username + '" berhasil diperbarui.', ui.ButtonSet.OK);
+}
+
+/**
+ * Dialog interaktif untuk mengaktifkan atau menonaktifkan akun pengguna.
+ */
+function menuToggleStatusPengguna() {
+  const ui = SpreadsheetApp.getUi();
+
+  const respUser = ui.prompt(
+    'Ubah Status Pengguna',
+    'Masukkan nama pengguna yang ingin diaktifkan/dinonaktifkan:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (respUser.getSelectedButton() !== ui.Button.OK) return;
+  const username = respUser.getResponseText().trim().toLowerCase();
+
+  if (!username) return;
+
+  const sheet = getSheet_(SHEET_USERS);
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, USERS_HEADERS.length).getValues() : [];
+
+  let rowIndex = -1;
+  let currentActive = true;
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][1] || '').trim().toLowerCase() === username) {
+      rowIndex = i + 2;
+      currentActive = rows[i][4] === true || rows[i][4] === 1 || String(rows[i][4]).toLowerCase() === 'true';
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    ui.alert('Tidak Ditemukan', 'Pengguna "' + username + '" tidak ditemukan.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const newActive = !currentActive;
+  sheet.getRange(rowIndex, 5).setValue(newActive);
+
+  ui.alert(
+    'Status Berhasil Diubah',
+    'Pengguna "' + username + '" sekarang berstatus: ' + (newActive ? 'AKTIF (bisa login)' : 'NONAKTIF (login diblokir)'),
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Menampilkan daftar pengguna yang terdaftar di spreadsheet.
+ */
+function menuLihatPengguna() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = getSheet_(SHEET_USERS);
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    ui.alert('Daftar Pengguna', 'Belum ada pengguna terdaftar.\nGunakan menu "FinTrack > Tambah Pengguna Baru".', ui.ButtonSet.OK);
+    return;
+  }
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, USERS_HEADERS.length).getValues();
+  const list = rows.map(function (row, idx) {
+    const username = row[1];
+    const active = row[4] === true || row[4] === 1 || String(row[4]).toLowerCase() === 'true';
+    const createdAt = String(row[5] || '').slice(0, 10);
+    return (idx + 1) + '. ' + username + ' [' + (active ? 'Aktif' : 'Nonaktif') + '] — dibuat: ' + createdAt;
+  }).join('\n');
+
+  ui.alert('Daftar Pengguna FinTrack (' + rows.length + ')', list, ui.ButtonSet.OK);
+}
+
+/**
+ * Menjalankan setup sheet dari menu spreadsheet.
+ */
+function menuSetup() {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    const hasil = setup();
+    ui.alert('Setup Berhasil', hasil, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('Gagal Setup', error.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Menampilkan status dan petunjuk deployment Web App.
+ */
+function menuPetunjukDeployment() {
+  const ui = SpreadsheetApp.getUi();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const userCount = Math.max(0, getSheet_(SHEET_USERS).getLastRow() - 1);
+  const txnCount = Math.max(0, getSheet_(SHEET_TRANSACTIONS).getLastRow() - 1);
+
+  const pesan = '📊 Status Spreadsheet FinTrack:\n'
+    + '• Total Pengguna: ' + userCount + '\n'
+    + '• Total Transaksi: ' + txnCount + '\n\n'
+    + '🌐 Petunjuk Deployment Web App:\n'
+    + '1. Buka menu Ekstensi > Apps Script.\n'
+    + '2. Klik "Terapkan" (Deploy) > "Penerapan Baru" (New deployment).\n'
+    + '3. Pilih jenis: "Aplikasi Web" (Web app).\n'
+    + '4. Jalankan sebagai: "Saya" (Me).\n'
+    + '5. Siapa yang memiliki akses: "Siapa saja" (Anyone).\n'
+    + '6. Salin URL Web App yang berakhiran "/exec".\n'
+    + '7. Tempelkan URL tersebut ke CONFIG.API_URL di app.js.\n\n'
+    + '💡 Tips Penting:\n'
+    + 'Menambah/mengubah pengguna melalui menu "FinTrack" ini TIDAK memerlukan deployment baru! Data langsung tersimpan di lembar sheet dan dapat langsung digunakan.';
+
+  ui.alert('Status & Petunjuk Deployment', pesan, ui.ButtonSet.OK);
+}
+
+/**
+ * Menjalankan self-test dari menu spreadsheet.
+ */
+function menuJalankanSelfTests() {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    const hasil = runSelfTests();
+    ui.alert('Hasil Self-Tests', hasil + '\n\nSemua pengujian backend lulus.', ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('Self-Test Gagal', error.message, ui.ButtonSet.OK);
+  }
+}
 
 /* ---------- Setup ---------- */
 
