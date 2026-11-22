@@ -12,6 +12,7 @@ const CONFIG = {
   CACHE_KEY_PREFIX: 'fintrack.cache.transactions.',
   QUEUE_KEY_PREFIX: 'fintrack.offline_queue.',
   BUDGETS_KEY_PREFIX: 'fintrack.budgets.',
+  SETTINGS_KEY_PREFIX: 'fintrack.settings.',
   REQUEST_TIMEOUT_MS: 30000,
   SESSION_EXPIRED_MESSAGE: 'Sesi berakhir. Silakan masuk kembali.',
   OFFLINE_MESSAGE: 'Anda sedang offline. Data memerlukan koneksi internet.',
@@ -54,6 +55,8 @@ const CHART_COLORS = [
 const state = {
   session: null,
   transactions: [],
+  budgets: {},
+  settings: {},
   loading: false,
   filters: { from: '', to: '', category: '', preset: 'all' },
   editingId: null,
@@ -121,6 +124,45 @@ function getQueueKey(userId) {
 function getBudgetsKey(userId) {
   const uid = userId || (state.session && state.session.user && state.session.user.id) || 'default';
   return CONFIG.BUDGETS_KEY_PREFIX + uid;
+}
+
+function getSettingsKey(userId) {
+  const uid = userId || (state.session && state.session.user && state.session.user.id) || 'default';
+  return CONFIG.SETTINGS_KEY_PREFIX + uid;
+}
+
+function getCachedBudgets(userId) {
+  try {
+    const raw = localStorage.getItem(getBudgetsKey(userId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function setCachedBudgets(userId, budgets) {
+  try {
+    localStorage.setItem(getBudgetsKey(userId), JSON.stringify(budgets || {}));
+  } catch (e) {}
+}
+
+function getCachedSettings(userId) {
+  try {
+    const raw = localStorage.getItem(getSettingsKey(userId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function setCachedSettings(userId, settings) {
+  try {
+    localStorage.setItem(getSettingsKey(userId), JSON.stringify(settings || {}));
+  } catch (e) {}
 }
 
 function getCachedTransactions(userId) {
@@ -353,6 +395,24 @@ function toggleTheme() {
 
   applyTheme(newTheme);
   showToast('Tema diubah ke mode ' + (newTheme === 'dark' ? 'gelap' : 'terang') + '.', 'success');
+
+  // Persist preference to Google Spreadsheet (Settings sheet) for the logged-in user
+  if (state.session && state.session.token && state.session.user) {
+    const userId = state.session.user.id;
+    if (!state.settings) state.settings = {};
+    state.settings.theme = newTheme;
+    setCachedSettings(userId, state.settings);
+
+    if (navigator.onLine) {
+      api('saveSetting', { token: state.session.token, key: 'theme', value: newTheme })
+        .catch((err) => {
+          console.warn('Gagal menyimpan tema ke server:', err);
+          enqueueOfflineMutation({ action: 'saveSetting', payload: { key: 'theme', value: newTheme } });
+        });
+    } else {
+      enqueueOfflineMutation({ action: 'saveSetting', payload: { key: 'theme', value: newTheme } });
+    }
+  }
 }
 
 function initTheme() {
@@ -457,10 +517,34 @@ async function loadTransactions() {
 
   if (navigator.onLine) {
     try {
-      const data = await api('getTransactions', { token: state.session.token });
-      const rows = Array.isArray(data) ? data : [];
+      const [txnsData, budgetsData, settingsData] = await Promise.all([
+        api('getTransactions', { token: state.session.token }),
+        api('getBudgets', { token: state.session.token }).catch((err) => {
+          console.warn('Gagal memuat target anggaran dari server:', err);
+          return null;
+        }),
+        api('getSettings', { token: state.session.token }).catch((err) => {
+          console.warn('Gagal memuat pengaturan dari server:', err);
+          return null;
+        }),
+      ]);
+
+      const rows = Array.isArray(txnsData) ? txnsData : [];
       state.transactions = rows.map(normalizeTransaction).filter(Boolean);
       setCachedTransactions(userId, state.transactions);
+
+      if (budgetsData && typeof budgetsData === 'object') {
+        state.budgets = budgetsData;
+        setCachedBudgets(userId, state.budgets);
+      }
+      if (settingsData && typeof settingsData === 'object') {
+        state.settings = settingsData;
+        setCachedSettings(userId, state.settings);
+        if (settingsData.theme) {
+          applyTheme(settingsData.theme);
+        }
+      }
+
       serverLoaded = true;
 
       // Auto-sync any offline items
@@ -479,14 +563,20 @@ async function loadTransactions() {
 
   if (!serverLoaded) {
     // Offline or network error: load from local cache
-    const cached = getCachedTransactions(userId);
-    if (cached.length > 0) {
-      state.transactions = cached;
+    const cachedTxns = getCachedTransactions(userId);
+    state.budgets = getCachedBudgets(userId);
+    state.settings = getCachedSettings(userId);
+    if (state.settings && state.settings.theme) {
+      applyTheme(state.settings.theme);
+    }
+
+    if (cachedTxns.length > 0) {
+      state.transactions = cachedTxns;
       if (navigator.onLine) {
         showToast('Memuat data dari penyimpanan perangkat (server tidak dapat dijangkau).', 'error');
       }
     } else {
-      showAppError(navigator.onLine ? 'Gagal memuat transaksi dari server.' : CONFIG.OFFLINE_MESSAGE);
+      showAppError(navigator.onLine ? 'Gagal memuat data dari server.' : CONFIG.OFFLINE_MESSAGE);
     }
   }
 
@@ -694,20 +784,15 @@ function renderTransactions() {
 /* ---------- Target Anggaran (Budgeting) ---------- */
 
 function getBudgets(userId) {
-  try {
-    const raw = localStorage.getItem(getBudgetsKey(userId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
-  } catch (e) {
-    return {};
+  if (state.budgets && typeof state.budgets === 'object' && Object.keys(state.budgets).length > 0) {
+    return state.budgets;
   }
+  return getCachedBudgets(userId);
 }
 
 function saveBudgets(userId, budgets) {
-  try {
-    localStorage.setItem(getBudgetsKey(userId), JSON.stringify(budgets));
-  } catch (e) {}
+  state.budgets = budgets || {};
+  setCachedBudgets(userId, state.budgets);
 }
 
 function calculateBudgetStatus(transactions, budgets, referenceDate) {
@@ -902,7 +987,7 @@ function createBudgetRow(categoryName = '', amountVal = '') {
   return row;
 }
 
-function handleBudgetSubmit(event) {
+async function handleBudgetSubmit(event) {
   event.preventDefault();
   if (!state.session || !state.session.user) return;
 
@@ -920,10 +1005,27 @@ function handleBudgetSubmit(event) {
     }
   }
 
-  saveBudgets(state.session.user.id, newBudgets);
+  const userId = state.session.user.id;
+  saveBudgets(userId, newBudgets);
   closeDialog($('budget-dialog'));
   renderBudgets();
-  showToast('Target anggaran berhasil disimpan.', 'success');
+
+  if (navigator.onLine) {
+    try {
+      await api('saveBudgets', { token: state.session.token, budgets: newBudgets });
+      showToast('Target anggaran berhasil disimpan ke Google Spreadsheet.', 'success');
+    } catch (err) {
+      if (isSessionExpiredError(err)) {
+        expireSession();
+        return;
+      }
+      enqueueOfflineMutation({ action: 'saveBudgets', payload: { budgets: newBudgets } });
+      showToast('Target anggaran disimpan secara offline. Akan disinkronkan saat online.', 'info');
+    }
+  } else {
+    enqueueOfflineMutation({ action: 'saveBudgets', payload: { budgets: newBudgets } });
+    showToast('Target anggaran disimpan offline. Akan disinkronkan ke Google Spreadsheet saat online.', 'info');
+  }
 }
 
 /* ---------- Visualisasi & Analisis Grafik (Charts) ---------- */
@@ -1365,6 +1467,17 @@ async function handleLogin(event) {
     if (!valid) throw new AppError('Respons server tidak valid.', 'invalid');
 
     state.session = session;
+    if (session.budgets && typeof session.budgets === 'object') {
+      state.budgets = session.budgets;
+      setCachedBudgets(session.user.id, session.budgets);
+    }
+    if (session.settings && typeof session.settings === 'object') {
+      state.settings = session.settings;
+      setCachedSettings(session.user.id, session.settings);
+      if (session.settings.theme) {
+        applyTheme(session.settings.theme);
+      }
+    }
     storeSession(session);
     $('login-form').reset();
     showApp();
@@ -1412,6 +1525,17 @@ async function handleRegister(event) {
     if (!valid) throw new AppError('Respons pendaftaran server tidak valid.', 'invalid');
 
     state.session = session;
+    if (session.budgets && typeof session.budgets === 'object') {
+      state.budgets = session.budgets;
+      setCachedBudgets(session.user.id, session.budgets);
+    }
+    if (session.settings && typeof session.settings === 'object') {
+      state.settings = session.settings;
+      setCachedSettings(session.user.id, session.settings);
+      if (session.settings.theme) {
+        applyTheme(session.settings.theme);
+      }
+    }
     storeSession(session);
     $('register-form').reset();
     showApp();
@@ -1522,6 +1646,8 @@ function handleLogout() {
   clearStoredSession();
   state.session = null;
   state.transactions = [];
+  state.budgets = {};
+  state.settings = {};
   resetFilterControls();
   state.editingId = null;
   state.deletingId = null;
@@ -1887,6 +2013,14 @@ async function syncOfflineQueue() {
         await api('deleteTransaction', { token: state.session.token, id: item.id });
         state.transactions = state.transactions.filter((t) => t.id !== item.id);
         syncedCount++;
+      } else if (item.action === 'saveBudgets') {
+        const payload = Object.assign({ token: state.session.token }, item.payload);
+        await api('saveBudgets', payload);
+        syncedCount++;
+      } else if (item.action === 'saveSetting') {
+        const payload = Object.assign({ token: state.session.token }, item.payload);
+        await api('saveSetting', payload);
+        syncedCount++;
       }
     } catch (err) {
       if (isSessionExpiredError(err)) {
@@ -1906,7 +2040,7 @@ async function syncOfflineQueue() {
   updateSyncStatus();
 
   if (syncedCount > 0) {
-    showToast(`${syncedCount} transaksi offline berhasil disinkronkan ke server.`, 'success');
+    showToast(`${syncedCount} perubahan data offline berhasil disinkronkan ke server.`, 'success');
     renderCategoryOptions();
     renderAll();
   }
@@ -2118,6 +2252,13 @@ function restoreSession() {
   }
 
   state.session = session;
+  if (session.user && session.user.id) {
+    state.budgets = getCachedBudgets(session.user.id);
+    state.settings = getCachedSettings(session.user.id);
+    if (state.settings && state.settings.theme) {
+      applyTheme(state.settings.theme);
+    }
+  }
   showApp();
   loadTransactions();
 }
@@ -2183,6 +2324,17 @@ function runSelfTests() {
   check('validasi username tolak spasi', !/^[a-z0-9._-]{3,64}$/.test('budi santoso'));
   check('validasi username tolak pendek', !/^[a-z0-9._-]{3,64}$/.test('ab'));
 
+  // FinTrack v1.1 checks
+  check('konfigurasi settings key prefix ada', Boolean(CONFIG.SETTINGS_KEY_PREFIX));
+  check('offline queue mutation saveBudgets valid', (function () {
+    const q = [{ action: 'saveBudgets', payload: { budgets: { 'Makanan': 500000 } } }];
+    return q[0].action === 'saveBudgets' && q[0].payload.budgets.Makanan === 500000;
+  })());
+  check('offline queue mutation saveSetting valid', (function () {
+    const q = [{ action: 'saveSetting', payload: { key: 'theme', value: 'dark' } }];
+    return q[0].action === 'saveSetting' && q[0].payload.key === 'theme';
+  })());
+
   console.table(results);
   const failed = results.filter((result) => !result.pass);
   if (failed.length) {
@@ -2191,14 +2343,6 @@ function runSelfTests() {
     console.info('FinTrack self-test lulus: ' + results.length + '/' + results.length);
   }
   return results;
-}
-
-window.fintrackSelfTest = runSelfTests;
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
 }
 
 window.fintrackSelfTest = runSelfTests;

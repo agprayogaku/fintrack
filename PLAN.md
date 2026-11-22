@@ -236,7 +236,27 @@ Headers: `id`, `userId`, `date`, `description`, `category`, `amount`, `type`, `c
 - Update and delete require a matching transaction `id` **and** `userId`.
 - Text fields beginning with `=`, `+`, `-`, or `@` are prefixed with an apostrophe before writing to the sheet to prevent spreadsheet formula injection. The prefix is removed when reading.
 
-### 5.3 Session secret
+### 5.3 Budgets sheet (v1.1)
+
+Headers: `userId`, `category`, `amount`, `updatedAt`
+
+- `userId`: owner ID from the authenticated session token.
+- `category`: trimmed, 1–40 characters.
+- `amount`: positive whole integer monthly budget (IDR).
+- `updatedAt`: ISO timestamp.
+- Stores user monthly budget targets per category permanently in Google Spreadsheet.
+
+### 5.4 Settings sheet (v1.1)
+
+Headers: `userId`, `key`, `value`, `updatedAt`
+
+- `userId`: owner ID from the authenticated session token.
+- `key`: setting key (e.g., `theme`).
+- `value`: setting value (e.g., `dark` or `light`).
+- `updatedAt`: ISO timestamp.
+- Stores user preferences permanently in Google Spreadsheet.
+
+### 5.5 Session secret
 
 `AUTH_SECRET` is stored in Apps Script `ScriptProperties`, never in the client. It is used to sign stateless session tokens.
 
@@ -256,13 +276,20 @@ or
 
 | Action | Method | Payload | Success data |
 |---|---|---|---|
-| `ping` | GET | none | `{ service, time }` |
-| `login` | POST | `{ username, password }` | `{ token, expiresAt, user }` |
-| `getTransactions` | POST (also read-only GET) | `{ token, from?, to?, category? }` | Transaction array |
+| `ping` | GET | none | `{ service, version, time }` |
+| `login` | POST | `{ username, password }` | `{ token, expiresAt, user, budgets, settings }` |
+| `register` | POST | `{ username, password }` | `{ token, expiresAt, user, budgets, settings }` |
+| `resetPassword` | POST | `{ username, newPassword }` | `{ message }` |
+| `changePassword` | POST | `{ token, currentPassword, newPassword }` | `{ message }` |
+| `getTransactions` | POST (also GET) | `{ token, from?, to?, category? }` | Transaction array |
 | `addTransaction` | POST | `{ token, date, description, category, amount, type }` | Created transaction |
 | `updateTransaction` | POST | `{ token, id, date, description, category, amount, type }` | Updated transaction |
 | `deleteTransaction` | POST | `{ token, id }` | `{ id }` |
-| `getSummary` | POST (also read-only GET) | `{ token, from?, to?, category? }` | `{ totalIncome, totalExpenses, net, categories }` |
+| `getSummary` | POST (also GET) | `{ token, from?, to?, category? }` | `{ totalIncome, totalExpenses, net, categories }` |
+| `getBudgets` | POST (also GET) | `{ token }` | `{ [category]: amount }` |
+| `saveBudgets` | POST | `{ token, budgets: { [cat]: amt } }` | `{ [category]: amount }` |
+| `getSettings` | POST (also GET) | `{ token }` | `{ [key]: value }` |
+| `saveSetting` | POST | `{ token, key, value }` | `{ key, value }` |
 
 Routing notes:
 

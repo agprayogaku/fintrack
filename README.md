@@ -1,8 +1,18 @@
-# FinTrack — Pelacak Keuangan Pribadi (PWA)
+# FinTrack v1.1 — Pelacak Keuangan Pribadi (PWA)
 
-Aplikasi pencatatan keuangan pribadi modern, ringan (*zero-dependency*), dan aman yang dirancang khusus dalam **Rupiah (IDR)** dan **Bahasa Indonesia**. Menggunakan **Google Apps Script** dan **Google Sheets** sebagai *serverless backend* gratis tanpa memerlukan server atau database berbayar.
+Aplikasi pencatatan keuangan pribadi modern, ringan (*zero-dependency*), dan aman yang dirancang khusus dalam **Rupiah (IDR)** dan **Bahasa Indonesia**. Menggunakan **Google Apps Script** dan **Google Sheets** sebagai *serverless database* permanen tanpa memerlukan server atau database berbayar.
 
 Dapat diinstal langsung di Android, iOS, dan Desktop sebagai **Progressive Web App (PWA)** dengan kemampuan **Offline-First**.
+
+---
+
+## Yang Baru di Versi 1.1 (v1.1)
+
+- **Penyimpanan Permanen di Google Spreadsheet:**
+  - **Target Anggaran per Kategori (`Budgets`):** Seluruh target anggaran kini tersimpan permanen di lembar spreadsheet `Budgets` (kolom: `userId`, `category`, `amount`, `updatedAt`). Target anggaran tidak akan hilang saat berganti perangkat, berganti browser, atau membersihkan data browser.
+  - **Pengaturan & Preferensi Pengguna (`Settings`):** Preferensi pengguna (seperti mode tema gelap/terang) kini tersimpan permanen di lembar spreadsheet `Settings` (kolom: `userId`, `key`, `value`, `updatedAt`).
+  - **Offline Fallback & Sinkronisasi Cerdas:** Penyimpanan lokal (`localStorage`) kini murni berfungsi sebagai cache offline dan antrean mutasi offline (`saveBudgets` & `saveSetting`). Perubahan yang dilakukan saat offline otomatis dikirimkan ke spreadsheet begitu perangkat kembali online.
+  - **Menu Spreadsheet Terintegrasi:** Opsi baru **"📊 Lihat Target Anggaran (v1.1)"** pada toolbar Google Sheets untuk meninjau seluruh target anggaran pengguna secara interaktif.
 
 ---
 
@@ -75,13 +85,14 @@ fintrack/
    - Jalankan sebagai (*Execute as*): **Saya (Me)**.
    - Yang memiliki akses (*Who has access*): **Siapa saja (Anyone)**.
    - Klik **Terapkan (Deploy)** dan salin URL Web App (`https://script.google.com/macros/s/.../exec`).
-5. Muat ulang (*refresh*) halaman Google Sheets Anda di browser. Anda akan melihat menu kustom baru bernama **"FinTrack"** di toolbar atas (di sebelah menu *Bantuan / Help*).
+5. Muat ulang (*refresh*) halaman Google Sheets Anda di browser. Anda akan melihat menu kustom baru bernama **"FinTrack v1.1"** di toolbar atas (di sebelah menu *Bantuan / Help*).
 6. Di menu Google Sheets tersebut, Anda dapat langsung:
-   - Klik **FinTrack > ⚙️ Setup / Periksa Lembar Sheet** untuk menyiapkan lembar `Users` dan `Transactions`.
-   - Klik **FinTrack > 👤 Tambah Pengguna Baru** untuk membuat akun pengguna baru melalui pop-up interaktif (tanpa perlu menyentuh kode sama sekali!).
+   - Klik **FinTrack v1.1 > ⚙️ Setup / Periksa Lembar Sheet** untuk menyiapkan lembar `Users`, `Transactions`, `Budgets`, dan `Settings`.
+   - Klik **FinTrack v1.1 > 👤 Tambah Pengguna Baru** untuk membuat akun pengguna baru melalui pop-up interaktif (tanpa perlu menyentuh kode sama sekali!).
+   - Klik **FinTrack v1.1 > 📊 Lihat Target Anggaran (v1.1)** untuk meninjau data anggaran yang tersimpan.
    - Mengelola kata sandi atau melihat daftar pengguna kapan saja.
 
-> **💡 Catatan Penting:** Menambah pengguna, mereset kata sandi, atau mengubah status pengguna melalui menu Spreadsheet ini **TIDAK memerlukan deployment baru**! Data langsung tersimpan di lembar sheet dan dapat digunakan saat itu juga.
+> **💡 Catatan Penting:** Menambah pengguna, mereset kata sandi, atau mengubah status pengguna melalui menu Spreadsheet ini **TIDAK memerlukan deployment baru**! Data langsung tersimpan di lembar sheet dan dapat digunakan saat itu juga. Bagi yang meng-upgrade dari v1.0, cukup salin `Code.gs` terbaru, buat versi deployment baru (*Kelola Penerapan > Edit > Versi baru > Terapkan*), dan jalankan **Setup** sekali untuk membuat lembar `Budgets` & `Settings`.
 
 ### 2. Hubungkan Frontend ke Backend
 
