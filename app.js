@@ -1983,9 +1983,12 @@ async function syncOfflineQueue() {
   updateSyncStatus();
 
   let syncedCount = 0;
-  const remaining = [];
+  let syncFailed = false;
+  let lastError = null;
+  let failIndex = -1;
 
-  for (const item of queue) {
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i];
     try {
       if (item.action === 'add') {
         const payload = Object.assign({ token: state.session.token }, item.payload);
@@ -2029,11 +2032,14 @@ async function syncOfflineQueue() {
         return;
       }
       console.warn('Gagal sinkron item antrean:', item, err);
-      remaining.push(item);
+      syncFailed = true;
+      lastError = err;
+      failIndex = i;
       break;
     }
   }
 
+  const remaining = syncFailed ? queue.slice(failIndex) : [];
   saveOfflineQueue(userId, remaining);
   setCachedTransactions(userId, state.transactions);
   state.syncing = false;
@@ -2043,6 +2049,14 @@ async function syncOfflineQueue() {
     showToast(`${syncedCount} perubahan data offline berhasil disinkronkan ke server.`, 'success');
     renderCategoryOptions();
     renderAll();
+  }
+
+  if (syncFailed && lastError) {
+    if (lastError.message === 'Aksi tidak dikenal.') {
+      showToast('Gagal sinkron: Server backend Google Apps Script belum diperbarui ke v1.1. Buka Apps Script dan terapkan Versi Baru.', 'error');
+    } else {
+      showToast('Gagal sinkron: ' + (lastError.message || 'Terjadi kesalahan.'), 'error');
+    }
   }
 }
 
