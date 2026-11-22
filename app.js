@@ -4,7 +4,7 @@
 
 const CONFIG = {
   // Paste the Apps Script /exec URL here. Never put the spreadsheet ID in client code.
-  API_URL: 'https://script.google.com/macros/s/AKfycbzR_weZDA9TWr3A3I0pJB-e5ZMQA2bymTQsvYmM4IsuLinNC7agR4Zv6-U-fw1T30Pm3A/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwoGYwKo1bEhcTraaGRrYyW0u-P1XLCZby5u2Ci6HeP1ujwHVkMiQ8z3i2XEnPS-Yhixg/exec',
   LOCALE: 'id-ID',
   CURRENCY: 'IDR',
   SESSION_KEY: 'fintrack.session',
