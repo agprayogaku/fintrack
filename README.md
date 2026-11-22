@@ -1,4 +1,4 @@
-# FinTrack v1.1 — Pelacak Keuangan Pribadi (PWA)
+# FinTrack v1.0 — Pelacak Keuangan Pribadi (PWA)
 
 Aplikasi pencatatan keuangan pribadi modern, ringan (*zero-dependency*), dan aman yang dirancang khusus dalam **Rupiah (IDR)** dan **Bahasa Indonesia**. Menggunakan **Google Apps Script** dan **Google Sheets** sebagai *serverless database* permanen tanpa memerlukan server atau database berbayar.
 
@@ -6,18 +6,17 @@ Dapat diinstal langsung di Android, iOS, dan Desktop sebagai **Progressive Web A
 
 ---
 
-## Yang Baru di Versi 1.1 (v1.1)
-
-- **Penyimpanan Permanen di Google Spreadsheet:**
-  - **Target Anggaran per Kategori (`Budgets`):** Seluruh target anggaran kini tersimpan permanen di lembar spreadsheet `Budgets` (kolom: `userId`, `category`, `amount`, `updatedAt`). Target anggaran tidak akan hilang saat berganti perangkat, berganti browser, atau membersihkan data browser.
-  - **Pengaturan & Preferensi Pengguna (`Settings`):** Preferensi pengguna (seperti mode tema gelap/terang) kini tersimpan permanen di lembar spreadsheet `Settings` (kolom: `userId`, `key`, `value`, `updatedAt`).
-  - **Offline Fallback & Sinkronisasi Cerdas:** Penyimpanan lokal (`localStorage`) kini murni berfungsi sebagai cache offline dan antrean mutasi offline (`saveBudgets` & `saveSetting`). Perubahan yang dilakukan saat offline otomatis dikirimkan ke spreadsheet begitu perangkat kembali online.
-  - **Menu Spreadsheet Terintegrasi:** Opsi baru **"📊 Lihat Target Anggaran (v1.1)"** pada toolbar Google Sheets untuk meninjau seluruh target anggaran pengguna secara interaktif.
-
----
-
 ## Fitur Utama
 
+- **Penyimpanan Permanen di Google Spreadsheet:**
+  - **Target Pemenuhan Anggaran (`Budgets`):** Seluruh target pemenuhan kewajiban bulanan tersimpan permanen di lembar spreadsheet `Budgets` (kolom: `userId`, `category`, `amount`, `updatedAt`). Target tidak akan hilang saat berganti perangkat atau membersihkan browser.
+  - **Pengaturan & Preferensi Pengguna (`Settings`):** Preferensi pengguna (seperti mode tema gelap/terang) tersimpan permanen di lembar spreadsheet `Settings` (kolom: `userId`, `key`, `value`, `updatedAt`).
+  - **Offline Fallback & Sinkronisasi Cerdas:** Penyimpanan lokal (`localStorage`) berfungsi sebagai cache offline dan antrean mutasi offline (`saveBudgets` & `saveSetting`). Perubahan yang dilakukan saat offline otomatis disinkronkan ke spreadsheet saat kembali online.
+  - **Menu Spreadsheet Terintegrasi:** Menu kustom **"FinTrack v1.0"** pada toolbar Google Sheets untuk mengelola pengguna, memeriksa lembar sheet, dan meninjau data anggaran.
+- **Model Celengan & Target Pemenuhan Kewajiban:**
+  - **Pemasukan Bebas Kategori (`-`):** Pemasukan langsung masuk menambah saldo kas tanpa membebani alokasi kategori.
+  - **Kategori Khusus Pengeluaran & Anti-Defisit:** Pengeluaran wajib memilih kategori anggaran/pemenuhan, dilengkapi opsi bawaan *"Lainnya"*. Pengeluaran divalidasi tidak boleh melebihi sisa saldo kas yang tersedia.
+  - **Kategori Fleksibel:** Pengguna dapat mendefinisikan kategori pos pengeluaran tanpa nominal target tetap.
 - **Autentikasi Mandiri Lengkap (Web Auth):**
   - **Pendaftaran Akun:** Pengguna baru dapat mendaftar langsung dari halaman web FinTrack (*tab "Daftar Akun"*) dan langsung masuk secara otomatis.
   - **Reset Kata Sandi:** Pengguna yang lupa kata sandi dapat mereset kata sandinya secara langsung melalui tombol *"Lupa kata sandi?"* di halaman login.
@@ -29,24 +28,13 @@ Dapat diinstal langsung di Android, iOS, dan Desktop sebagai **Progressive Web A
   - Palet warna `oklch` yang diperkuat kontrasnya: teks lebih pekat dan tajam di mode terang, serta latar belakang gelap modern dengan teks putih bersih di mode gelap.
   - Lencana status pemasukan (hijau/mint) dan pengeluaran (merah/rose) kontras tinggi yang jelas dan mudah dibaca di bawah sinar matahari.
 - **Tampilan Sangat Responsif (Mobile-First):**
-  - Dioptimalkan khusus untuk layar ponsel pintar sempit (320px–480px) hingga layar tablet dan desktop.
+  - Dioptimalkan khusus untuk layar ponsel pintar sempit (320px–480px) hingga layar tablet dan desktop, dengan perbaikan tampilan input tanggal di iOS.
   - Tombol aksi dengan area sentuh nyaman (min. 44px), form adapts otomatis, dan dukungan *safe-area* (notch iPhone/Android).
 - **Pencatatan Keuangan (CRUD):** Catat pemasukan dan pengeluaran secara cepat dengan validasi bilangan bulat Rupiah (integer Rupiah).
-- **Target Anggaran per Kategori (Budgeting):**
-  - Tentukan batas pengeluaran bulanan untuk setiap kategori (misal: *Makanan: Rp 1.500.000*, *Transportasi: Rp 500.000*).
-  - Indikator progres visual dengan status otomatis: **Aman (< 75%)**, **Waspada (75%–99%)**, dan **Melebihi Anggaran (≥ 100%)**.
-  - Ringkasan total anggaran vs realisasi pengeluaran bulanan.
 - **Visualisasi & Analisis Grafik (Zero-Dependency):**
   - **Grafik Tren 6 Bulan:** Perbandingan pemasukan (hijau) vs pengeluaran (merah) dalam diagram batang berbasis SVG murni yang responsif dan tajam.
   - **Grafik Donut Porsi Pengeluaran:** Diagram lingkaran proporsi pengeluaran per kategori beserta persentase dan legenda warna.
-- **Pengalaman Offline Lanjutan (Offline-First):**
-  - **Local Cache:** Riwayat transaksi otomatis dicadangkan di penyimpanan lokal perangkat sehingga tetap dapat dibuka meski tanpa koneksi internet.
-  - **Antrean Mutasi Offline (Offline Queue):** Tetap dapat menambah, mengedit, atau menghapus transaksi saat offline.
-  - **Sinkronisasi Otomatis:** Saat internet kembali aktif, antrean perubahan disinkronkan secara otomatis (*auto-sync*) ke Google Sheets dengan indikator status.
 - **Filter Cepat (Quick Presets):** Pilihan 1-klik untuk *Semua*, *Bulan Ini*, *Bulan Lalu*, dan *30 Hari Terakhir*, serta filter rentang tanggal dan kategori.
-- **Desain Modern (shadcn-inspired) & Dark Mode:**
-  - Desain antarmuka bersih berbasis palet `oklch`.
-  - Otomatis mendukung **Mode Gelap (Dark Mode)** mengikuti pengaturan sistem perangkat.
 - **Keamanan & Privasi:**
   - Kata sandi di-hash server-side (*salted SHA-256*).
   - Token sesi stateless berbasis *HMAC-SHA256* berlaku 24 jam.
@@ -85,14 +73,14 @@ fintrack/
    - Jalankan sebagai (*Execute as*): **Saya (Me)**.
    - Yang memiliki akses (*Who has access*): **Siapa saja (Anyone)**.
    - Klik **Terapkan (Deploy)** dan salin URL Web App (`https://script.google.com/macros/s/.../exec`).
-5. Muat ulang (*refresh*) halaman Google Sheets Anda di browser. Anda akan melihat menu kustom baru bernama **"FinTrack v1.1"** di toolbar atas (di sebelah menu *Bantuan / Help*).
+5. Muat ulang (*refresh*) halaman Google Sheets Anda di browser. Anda akan melihat menu kustom baru bernama **"FinTrack v1.0"** di toolbar atas (di sebelah menu *Bantuan / Help*).
 6. Di menu Google Sheets tersebut, Anda dapat langsung:
-   - Klik **FinTrack v1.1 > ⚙️ Setup / Periksa Lembar Sheet** untuk menyiapkan lembar `Users`, `Transactions`, `Budgets`, dan `Settings`.
-   - Klik **FinTrack v1.1 > 👤 Tambah Pengguna Baru** untuk membuat akun pengguna baru melalui pop-up interaktif (tanpa perlu menyentuh kode sama sekali!).
-   - Klik **FinTrack v1.1 > 📊 Lihat Target Anggaran (v1.1)** untuk meninjau data anggaran yang tersimpan.
+   - Klik **FinTrack v1.0 > ⚙️ Setup / Periksa Lembar Sheet** untuk menyiapkan lembar `Users`, `Transactions`, `Budgets`, dan `Settings`.
+   - Klik **FinTrack v1.0 > 👤 Tambah Pengguna Baru** untuk membuat akun pengguna baru melalui pop-up interaktif (tanpa perlu menyentuh kode sama sekali!).
+   - Klik **FinTrack v1.0 > 📊 Lihat Target Anggaran (v1.0)** untuk meninjau data anggaran yang tersimpan.
    - Mengelola kata sandi atau melihat daftar pengguna kapan saja.
 
-> **💡 Catatan Penting:** Menambah pengguna, mereset kata sandi, atau mengubah status pengguna melalui menu Spreadsheet ini **TIDAK memerlukan deployment baru**! Data langsung tersimpan di lembar sheet dan dapat digunakan saat itu juga. Bagi yang meng-upgrade dari v1.0, cukup salin `Code.gs` terbaru, buat versi deployment baru (*Kelola Penerapan > Edit > Versi baru > Terapkan*), dan jalankan **Setup** sekali untuk membuat lembar `Budgets` & `Settings`.
+> **💡 Catatan Penting:** Menambah pengguna, mereset kata sandi, atau mengubah status pengguna melalui menu Spreadsheet ini **TIDAK memerlukan deployment baru**! Data langsung tersimpan di lembar sheet dan dapat digunakan saat itu juga. Cukup salin `Code.gs` terbaru, buat versi deployment baru (*Kelola Penerapan > Edit > Versi baru > Terapkan*), dan jalankan **Setup** sekali untuk membuat lembar `Budgets` & `Settings`.
 
 ### 2. Hubungkan Frontend ke Backend
 

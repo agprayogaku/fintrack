@@ -235,7 +235,7 @@ Headers: `id`, `userId`, `date`, `description`, `category`, `amount`, `type`, `c
 - Update and delete require a matching transaction `id` **and** `userId`.
 - Text fields beginning with `=`, `+`, `-`, or `@` are prefixed with an apostrophe before writing to the sheet to prevent spreadsheet formula injection. The prefix is removed when reading.
 
-### 5.3 Budgets sheet (v1.1)
+### 5.3 Budgets sheet (v1.0)
 
 Headers: `userId`, `category`, `amount`, `updatedAt`
 
@@ -245,7 +245,7 @@ Headers: `userId`, `category`, `amount`, `updatedAt`
 - `updatedAt`: ISO timestamp.
 - Stores user monthly budget targets per category permanently in Google Spreadsheet.
 
-### 5.4 Settings sheet (v1.1)
+### 5.4 Settings sheet (v1.0)
 
 Headers: `userId`, `key`, `value`, `updatedAt`
 

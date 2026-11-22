@@ -1,8 +1,8 @@
 'use strict';
 
-/* FinTrack v1.1 service worker — caches the app shell only, never API responses. */
+/* FinTrack v1.0 service worker — caches the app shell only, never API responses. */
 
-const CACHE_NAME = 'fintrack-shell-v1.1.3';
+const CACHE_NAME = 'fintrack-shell-v1.0';
 const APP_SHELL = [
   './',
   './index.html',

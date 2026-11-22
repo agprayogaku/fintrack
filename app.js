@@ -4,7 +4,7 @@
 
 const CONFIG = {
   // Paste the Apps Script /exec URL here. Never put the spreadsheet ID in client code.
-  API_URL: 'https://script.google.com/macros/s/AKfycbwoGYwKo1bEhcTraaGRrYyW0u-P1XLCZby5u2Ci6HeP1ujwHVkMiQ8z3i2XEnPS-Yhixg/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwEadhUEisvtF3fk9aKApEhOPSvmHu795s0LnR_28doalO6NygY_K_DaqGRMQr7g6RE/exec',
   LOCALE: 'id-ID',
   CURRENCY: 'IDR',
   SESSION_KEY: 'fintrack.session',
@@ -2204,7 +2204,7 @@ async function syncOfflineQueue() {
 
   if (syncFailed && lastError) {
     if (lastError.message === 'Aksi tidak dikenal.') {
-      showToast('Gagal sinkron: Server backend Google Apps Script belum diperbarui ke v1.1. Buka Apps Script dan terapkan Versi Baru.', 'error');
+      showToast('Gagal sinkron: Server backend Google Apps Script belum diperbarui. Buka Apps Script dan terapkan Versi Baru.', 'error');
     } else {
       showToast('Gagal sinkron: ' + (lastError.message || 'Terjadi kesalahan.'), 'error');
     }
@@ -2494,7 +2494,7 @@ function runSelfTests() {
   check('validasi username tolak spasi', !/^[a-z0-9._-]{3,64}$/.test('budi santoso'));
   check('validasi username tolak pendek', !/^[a-z0-9._-]{3,64}$/.test('ab'));
 
-  // FinTrack v1.1 checks
+  // FinTrack v1.0 checks
   check('konfigurasi settings key prefix ada', Boolean(CONFIG.SETTINGS_KEY_PREFIX));
   check('offline queue mutation saveBudgets valid', (function () {
     const q = [{ action: 'saveBudgets', payload: { budgets: { 'Makanan': 500000 } } }];

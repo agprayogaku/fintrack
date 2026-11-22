@@ -1,5 +1,5 @@
 /**
- * FinTrack v1.1 — Google Apps Script backend.
+ * FinTrack v1.0 — Google Apps Script backend.
  *
  * Spreadsheet-bound script.
  * Seluruh data (Transaksi, Pengguna, Target Anggaran, dan Pengaturan)
@@ -26,17 +26,17 @@ const GENERIC_SERVER_ERROR = 'Terjadi kesalahan server. Silakan coba lagi.';
 /* ---------- Menu Interaktif Spreadsheet ---------- */
 
 /**
- * Otomatis menambahkan menu "FinTrack v1.1" saat spreadsheet dibuka.
+ * Otomatis menambahkan menu "FinTrack v1.0" saat spreadsheet dibuka.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('FinTrack v1.1')
+    .createMenu('FinTrack v1.0')
     .addItem('👤 Tambah Pengguna Baru', 'menuTambahPengguna')
     .addItem('🔑 Reset Kata Sandi Pengguna', 'menuResetPassword')
     .addItem('🔄 Aktif / Nonaktifkan Pengguna', 'menuToggleStatusPengguna')
     .addItem('📋 Lihat Daftar Pengguna', 'menuLihatPengguna')
     .addSeparator()
-    .addItem('📊 Lihat Target Anggaran (v1.1)', 'menuLihatAnggaran')
+    .addItem('📊 Lihat Target Anggaran (v1.0)', 'menuLihatAnggaran')
     .addItem('⚙️ Setup / Periksa Lembar Sheet', 'menuSetup')
     .addItem('ℹ️ Status & Petunjuk Deployment', 'menuPetunjukDeployment')
     .addItem('🧪 Jalankan Self-Tests', 'menuJalankanSelfTests')
@@ -282,12 +282,12 @@ function menuPetunjukDeployment() {
   const budgetCount = Math.max(0, getSheet_(SHEET_BUDGETS).getLastRow() - 1);
   const settingCount = Math.max(0, getSheet_(SHEET_SETTINGS).getLastRow() - 1);
 
-  const pesan = '📊 Status Spreadsheet FinTrack v1.1:\n'
+  const pesan = '📊 Status Spreadsheet FinTrack v1.0:\n'
     + '• Total Pengguna: ' + userCount + '\n'
     + '• Total Transaksi: ' + txnCount + '\n'
     + '• Target Anggaran: ' + budgetCount + '\n'
     + '• Pengaturan Tersimpan: ' + settingCount + '\n\n'
-    + '🌐 Petunjuk Deployment Web App (v1.1):\n'
+    + '🌐 Petunjuk Deployment Web App (v1.0):\n'
     + '1. Buka menu Ekstensi > Apps Script.\n'
     + '2. Klik "Kelola Penerapan" (Manage deployments).\n'
     + '3. Klik ikon pensil (Edit) pada penerapan aktif.\n'
@@ -296,7 +296,7 @@ function menuPetunjukDeployment() {
     + '💡 Tips Penting:\n'
     + 'Menambah/mengubah pengguna dan target anggaran langsung tersimpan permanen di Google Spreadsheet!';
 
-  ui.alert('Status & Petunjuk Deployment v1.1', pesan, ui.ButtonSet.OK);
+  ui.alert('Status & Petunjuk Deployment v1.0', pesan, ui.ButtonSet.OK);
 }
 
 /**
@@ -330,7 +330,7 @@ function setup() {
     properties.setProperty('AUTH_SECRET', Utilities.getUuid() + Utilities.getUuid());
   }
 
-  return 'Setup v1.1 selesai. Lembar Users, Transactions, Budgets, dan Settings siap digunakan.';
+  return 'Setup v1.0 selesai. Lembar Users, Transactions, Budgets, dan Settings siap digunakan.';
 }
 
 function ensureSheet_(name, headers) {
@@ -412,7 +412,7 @@ function doGet(e) {
     const action = params.action || 'ping';
 
     if (action === 'ping') {
-      return ok_({ service: 'FinTrack', version: '1.1', time: new Date().toISOString() });
+      return ok_({ service: 'FinTrack', version: '1.0', time: new Date().toISOString() });
     }
     if (action === 'getTransactions' || action === 'getSummary' || action === 'getBudgets' || action === 'getSettings') {
       const userId = verifyToken_(params.token);
@@ -720,24 +720,32 @@ function readTransactions_(userId) {
   rows.forEach(function (row) {
     if (!row[0] || String(row[1]) !== userId) return;
 
-    const date = toISODate_(row[2], timeZone);
-    const amount = Number(row[5]);
-    if (!date || !Number.isFinite(amount)) return;
+    const txn = rowToTransaction_(row, timeZone);
+    if (!txn.date || !Number.isFinite(txn.amount)) return;
 
-    transactions.push({
-      id: String(row[0]),
-      userId: String(row[1]),
-      date: date,
-      description: unsanitizeText_(row[3]),
-      category: unsanitizeText_(row[4]),
-      amount: amount,
-      type: row[6] === 'income' ? 'income' : 'expense',
-      createdAt: toISOString_(row[7]),
-      updatedAt: toISOString_(row[8]),
-    });
+    transactions.push(txn);
   });
 
   return transactions;
+}
+
+function listTransactions_(userId) {
+  return readTransactions_(userId);
+}
+
+function rowToTransaction_(row, timeZone) {
+  const tz = timeZone || Session.getScriptTimeZone();
+  return {
+    id: String(row[0] || ''),
+    userId: String(row[1] || ''),
+    date: toISODate_(row[2], tz),
+    description: unsanitizeText_(row[3]),
+    category: unsanitizeText_(row[4]),
+    amount: Number(row[5]),
+    type: row[6] === 'income' ? 'income' : 'expense',
+    createdAt: toISOString_(row[7]),
+    updatedAt: toISOString_(row[8]),
+  };
 }
 
 function formatRupiah_(amount) {
@@ -745,7 +753,7 @@ function formatRupiah_(amount) {
 }
 
 function getUserCashBalance_(userId, excludeTxnId) {
-  const transactions = listTransactions_(userId);
+  const transactions = readTransactions_(userId);
   let balance = 0;
   transactions.forEach(function (t) {
     if (excludeTxnId && String(t.id) === String(excludeTxnId)) return;
@@ -977,7 +985,7 @@ function publicTransaction_(transaction) {
   };
 }
 
-/* ---------- Budgets (v1.1) ---------- */
+/* ---------- Budgets (v1.0) ---------- */
 
 /**
  * Mengambil semua target anggaran untuk pengguna tertentu dari sheet Budgets.
@@ -1054,7 +1062,7 @@ function saveBudgets_(userId, payload) {
   return sanitizedBudgets;
 }
 
-/* ---------- Settings (v1.1) ---------- */
+/* ---------- Settings (v1.0) ---------- */
 
 /**
  * Mengambil preferensi pengguna (seperti tema) dari sheet Settings.
@@ -1133,6 +1141,7 @@ function unsanitizeText_(value) {
 
 function toISODate_(value, timeZone) {
   if (value instanceof Date) {
+    if (isNaN(value.getTime())) return '';
     return Utilities.formatDate(value, timeZone, 'yyyy-MM-dd');
   }
   const text = String(value == null ? '' : value).trim();
@@ -1140,7 +1149,9 @@ function toISODate_(value, timeZone) {
 }
 
 function toISOString_(value) {
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Date) {
+    return !isNaN(value.getTime()) ? value.toISOString() : '';
+  }
   return value == null ? '' : String(value);
 }
 
@@ -1210,10 +1221,15 @@ function runSelfTests() {
   check('ringkasan bersih', summary.net === 4965000);
   check('kategori pengeluaran terkelompok', summary.categories.length === 1 && summary.categories[0].name === 'Makanan');
 
-  // Pengujian FinTrack v1.1
+  // Pengujian FinTrack v1.0
   check('proteksi formula budget', protectText_('=SUM(A1:A10)') === "'=SUM(A1:A10)");
-  check('konstanta sheet v1.1 ada', SHEET_BUDGETS === 'Budgets' && SHEET_SETTINGS === 'Settings');
-  check('header sheet v1.1 valid', BUDGETS_HEADERS.length === 4 && SETTINGS_HEADERS.length === 4);
+  check('konstanta sheet v1.0 ada', SHEET_BUDGETS === 'Budgets' && SHEET_SETTINGS === 'Settings');
+  check('header sheet v1.0 valid', BUDGETS_HEADERS.length === 4 && SETTINGS_HEADERS.length === 4);
+  const sampleRow = ['tx-1', 'user-1', '2026-11-22', 'Makan', 'Makanan', 25000, 'expense', '2026-11-22T00:00:00.000Z', '2026-11-22T00:00:00.000Z'];
+  const parsedTxn = rowToTransaction_(sampleRow, 'Asia/Jakarta');
+  check('rowToTransaction_ valid', parsedTxn.id === 'tx-1' && parsedTxn.amount === 25000 && parsedTxn.type === 'expense');
+  check('formatRupiah_ valid', formatRupiah_(1500000) === 'Rp 1.500.000');
+  check('listTransactions_ terdefinisi', typeof listTransactions_ === 'function' && typeof readTransactions_ === 'function');
 
   Logger.log(JSON.stringify(results, null, 2));
   const failed = results.filter(function (result) { return !result.pass; });
