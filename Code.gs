@@ -405,6 +405,12 @@ function handleAction_(action, payload) {
   switch (action) {
     case 'login':
       return login_(payload);
+    case 'register':
+      return register_(payload);
+    case 'resetPassword':
+      return resetPassword_(payload);
+    case 'changePassword':
+      return changePassword_(requireUser_(payload), payload);
     case 'getTransactions':
       return getTransactions_(requireUser_(payload), payload);
     case 'addTransaction':
@@ -475,6 +481,91 @@ function login_(payload) {
     expiresAt: Date.now() + TOKEN_TTL_MS,
     user: { id: userId, username: String(userRow[1]) },
   };
+}
+
+function register_(payload) {
+  const username = String((payload && payload.username) || '').trim().toLowerCase();
+  const password = String((payload && payload.password) || '');
+
+  // Validasi dan simpan pengguna baru ke sheet Users
+  createUser(username, password);
+
+  // Otomatis login dan kembalikan token sesi
+  return login_({ username: username, password: password });
+}
+
+function resetPassword_(payload) {
+  const username = String((payload && payload.username) || '').trim().toLowerCase();
+  const newPassword = String((payload && payload.newPassword) || '');
+
+  if (!username) throw userError_('Nama pengguna wajib diisi.');
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+    throw userError_('Kata sandi baru harus 8–128 karakter.');
+  }
+
+  const sheet = getSheet_(SHEET_USERS);
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, USERS_HEADERS.length).getValues() : [];
+
+  let rowIndex = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (String(rows[i][1] || '').trim().toLowerCase() === username) {
+      rowIndex = i + 2;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw userError_('Nama pengguna tidak ditemukan.');
+  }
+
+  const newSalt = Utilities.getUuid();
+  const newHash = hashPassword_(newPassword, newSalt);
+
+  sheet.getRange(rowIndex, 3).setValue(newSalt);
+  sheet.getRange(rowIndex, 4).setValue(newHash);
+
+  return { message: 'Kata sandi berhasil diperbarui. Silakan masuk dengan kata sandi baru Anda.' };
+}
+
+function changePassword_(userId, payload) {
+  const currentPassword = String((payload && payload.currentPassword) || '');
+  const newPassword = String((payload && payload.newPassword) || '');
+
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+    throw userError_('Kata sandi baru harus 8–128 karakter.');
+  }
+
+  const sheet = getSheet_(SHEET_USERS);
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, USERS_HEADERS.length).getValues() : [];
+
+  let userRow = null;
+  let rowIndex = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (String(rows[i][0]) === userId) {
+      userRow = rows[i];
+      rowIndex = i + 2;
+      break;
+    }
+  }
+
+  if (!userRow) throw userError_('Pengguna tidak ditemukan.');
+
+  const suppliedHash = hashPassword_(currentPassword, String(userRow[2] || ''));
+  const storedHash = String(userRow[3] || '');
+
+  if (!safeEquals_(suppliedHash, storedHash)) {
+    throw userError_('Kata sandi saat ini salah.');
+  }
+
+  const newSalt = Utilities.getUuid();
+  const newHash = hashPassword_(newPassword, newSalt);
+
+  sheet.getRange(rowIndex, 3).setValue(newSalt);
+  sheet.getRange(rowIndex, 4).setValue(newHash);
+
+  return { message: 'Kata sandi berhasil diperbarui.' };
 }
 
 function hashPassword_(password, salt) {

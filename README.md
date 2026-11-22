@@ -8,6 +8,19 @@ Dapat diinstal langsung di Android, iOS, dan Desktop sebagai **Progressive Web A
 
 ## Fitur Utama
 
+- **Autentikasi Mandiri Lengkap (Web Auth):**
+  - **Pendaftaran Akun:** Pengguna baru dapat mendaftar langsung dari halaman web FinTrack (*tab "Daftar Akun"*) dan langsung masuk secara otomatis.
+  - **Reset Kata Sandi:** Pengguna yang lupa kata sandi dapat mereset kata sandinya secara langsung melalui tombol *"Lupa kata sandi?"* di halaman login.
+  - **Ubah Kata Sandi:** Pengguna yang sudah masuk dapat memperbarui kata sandi lama ke kata sandi baru dari tombol kunci di header aplikasi.
+- **Tombol Pengganti Tema (Dark / Light Theme Toggle):**
+  - Tombol ikon Matahari/Bulan yang dapat diklik langsung di halaman login dan header aplikasi untuk berpindah antara Mode Gelap dan Mode Terang kapan saja.
+  - Preferensi tema tersimpan di penyimpanan lokal dan otomatis menyesuaikan tema perangkat jika belum disetel manual.
+- **Peningkatan Kontras & Keterbacaan Tinggi (WCAG Compliant):**
+  - Palet warna `oklch` yang diperkuat kontrasnya: teks lebih pekat dan tajam di mode terang, serta latar belakang gelap modern dengan teks putih bersih di mode gelap.
+  - Lencana status pemasukan (hijau/mint) dan pengeluaran (merah/rose) kontras tinggi yang jelas dan mudah dibaca di bawah sinar matahari.
+- **Tampilan Sangat Responsif (Mobile-First):**
+  - Dioptimalkan khusus untuk layar ponsel pintar sempit (320px–480px) hingga layar tablet dan desktop.
+  - Tombol aksi dengan area sentuh nyaman (min. 44px), form adapts otomatis, dan dukungan *safe-area* (notch iPhone/Android).
 - **Pencatatan Keuangan (CRUD):** Catat pemasukan dan pengeluaran secara cepat dengan validasi bilangan bulat Rupiah (integer Rupiah).
 - **Target Anggaran per Kategori (Budgeting):**
   - Tentukan batas pengeluaran bulanan untuk setiap kategori (misal: *Makanan: Rp 1.500.000*, *Transportasi: Rp 500.000*).

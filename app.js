@@ -4,10 +4,11 @@
 
 const CONFIG = {
   // Paste the Apps Script /exec URL here. Never put the spreadsheet ID in client code.
-  API_URL: 'PASTE_APPS_SCRIPT_EXEC_URL_HERE',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzR_weZDA9TWr3A3I0pJB-e5ZMQA2bymTQsvYmM4IsuLinNC7agR4Zv6-U-fw1T30Pm3A/exec',
   LOCALE: 'id-ID',
   CURRENCY: 'IDR',
   SESSION_KEY: 'fintrack.session',
+  THEME_KEY: 'fintrack.theme',
   CACHE_KEY_PREFIX: 'fintrack.cache.transactions.',
   QUEUE_KEY_PREFIX: 'fintrack.offline_queue.',
   BUDGETS_KEY_PREFIX: 'fintrack.budgets.',
@@ -322,12 +323,66 @@ function clearStoredSession() {
   } catch (error) {}
 }
 
-/* ---------- Views ---------- */
+/* ---------- Theme Management ---------- */
+
+function getStoredTheme() {
+  try {
+    return localStorage.getItem(CONFIG.THEME_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+
+function applyTheme(theme) {
+  if (theme === 'dark' || theme === 'light') {
+    document.documentElement.setAttribute('data-theme', theme);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+
+function toggleTheme() {
+  const currentAttr = document.documentElement.getAttribute('data-theme');
+  const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDarkNow = currentAttr ? currentAttr === 'dark' : systemDark;
+  const newTheme = isDarkNow ? 'light' : 'dark';
+
+  try {
+    localStorage.setItem(CONFIG.THEME_KEY, newTheme);
+  } catch (e) {}
+
+  applyTheme(newTheme);
+  showToast('Tema diubah ke mode ' + (newTheme === 'dark' ? 'gelap' : 'terang') + '.', 'success');
+}
+
+function initTheme() {
+  const stored = getStoredTheme();
+  if (stored) {
+    applyTheme(stored);
+  }
+}
+
+/* ---------- Views & Auth Tabs ---------- */
+
+function switchAuthTab(targetTab) {
+  const isLogin = targetTab === 'login';
+  $('tab-login').classList.toggle('active', isLogin);
+  $('tab-login').setAttribute('aria-selected', String(isLogin));
+  $('tab-register').classList.toggle('active', !isLogin);
+  $('tab-register').setAttribute('aria-selected', String(!isLogin));
+
+  $('login-panel').hidden = !isLogin;
+  $('register-panel').hidden = isLogin;
+
+  hideLoginError();
+  hideRegisterError();
+}
 
 function showLogin(message) {
   $('login-view').hidden = false;
   $('app-view').hidden = true;
   $('login-password').value = '';
+  switchAuthTab('login');
   if (message) {
     showLoginError(message);
   } else {
@@ -354,6 +409,16 @@ function hideLoginError() {
   $('login-error-text').textContent = '';
 }
 
+function showRegisterError(message) {
+  $('register-error-text').textContent = message;
+  $('register-error').hidden = false;
+}
+
+function hideRegisterError() {
+  $('register-error').hidden = true;
+  $('register-error-text').textContent = '';
+}
+
 function showAppError(message) {
   $('app-error-text').textContent = message;
   $('app-error').hidden = false;
@@ -374,6 +439,8 @@ function expireSession() {
   closeDialog($('txn-dialog'));
   closeDialog($('delete-dialog'));
   closeDialog($('budget-dialog'));
+  closeDialog($('reset-password-dialog'));
+  closeDialog($('change-password-dialog'));
   showLogin(CONFIG.SESSION_EXPIRED_MESSAGE);
 }
 
@@ -1309,6 +1376,148 @@ async function handleLogin(event) {
   }
 }
 
+async function handleRegister(event) {
+  event.preventDefault();
+  hideRegisterError();
+
+  const username = $('register-username').value.trim().toLowerCase();
+  const password = $('register-password').value;
+  const confirm = $('register-confirm').value;
+
+  if (!username) {
+    showRegisterError('Nama pengguna wajib diisi.');
+    return;
+  }
+  if (!/^[a-z0-9._-]{3,64}$/.test(username)) {
+    showRegisterError('Nama pengguna harus 3–64 karakter (huruf, angka, titik, strip, underscore tanpa spasi).');
+    return;
+  }
+  if (!password || password.length < 8) {
+    showRegisterError('Kata sandi minimal harus 8 karakter.');
+    return;
+  }
+  if (password !== confirm) {
+    showRegisterError('Konfirmasi kata sandi tidak cocok.');
+    return;
+  }
+
+  setButtonBusy($('register-submit'), true, 'Mendaftarkan…');
+  try {
+    const session = await api('register', { username, password });
+    const valid = session
+      && typeof session.token === 'string'
+      && typeof session.expiresAt === 'number'
+      && session.user;
+
+    if (!valid) throw new AppError('Respons pendaftaran server tidak valid.', 'invalid');
+
+    state.session = session;
+    storeSession(session);
+    $('register-form').reset();
+    showApp();
+    await loadTransactions();
+    showToast('Akun berhasil dibuat! Selamat datang di FinTrack.', 'success');
+  } catch (error) {
+    showRegisterError(error.message || 'Pendaftaran gagal. Silakan coba lagi.');
+  } finally {
+    setButtonBusy($('register-submit'), false);
+  }
+}
+
+function openResetPasswordDialog() {
+  $('reset-password-form').reset();
+  $('reset-error').hidden = true;
+  $('reset-username').value = $('login-username').value.trim();
+  openDialog($('reset-password-dialog'));
+}
+
+async function handleResetPasswordSubmit(event) {
+  event.preventDefault();
+  $('reset-error').hidden = true;
+
+  const username = $('reset-username').value.trim().toLowerCase();
+  const newPassword = $('reset-new-password').value;
+  const confirmNewPassword = $('reset-confirm-password').value;
+
+  if (!username) {
+    $('reset-error-text').textContent = 'Nama pengguna wajib diisi.';
+    $('reset-error').hidden = false;
+    return;
+  }
+  if (!newPassword || newPassword.length < 8) {
+    $('reset-error-text').textContent = 'Kata sandi baru minimal harus 8 karakter.';
+    $('reset-error').hidden = false;
+    return;
+  }
+  if (newPassword !== confirmNewPassword) {
+    $('reset-error-text').textContent = 'Konfirmasi kata sandi baru tidak cocok.';
+    $('reset-error').hidden = false;
+    return;
+  }
+
+  setButtonBusy($('reset-submit'), true, 'Memproses…');
+  try {
+    const res = await api('resetPassword', { username, newPassword });
+    closeDialog($('reset-password-dialog'));
+    $('login-username').value = username;
+    $('login-password').value = '';
+    switchAuthTab('login');
+    showToast(res && res.message ? res.message : 'Kata sandi berhasil direset. Silakan masuk.', 'success');
+  } catch (error) {
+    $('reset-error-text').textContent = error.message || 'Gagal mereset kata sandi.';
+    $('reset-error').hidden = false;
+  } finally {
+    setButtonBusy($('reset-submit'), false);
+  }
+}
+
+function openChangePasswordDialog() {
+  $('change-password-form').reset();
+  $('change-error').hidden = true;
+  openDialog($('change-password-dialog'));
+}
+
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+  $('change-error').hidden = true;
+
+  const currentPassword = $('change-current-password').value;
+  const newPassword = $('change-new-password').value;
+  const confirmNewPassword = $('change-confirm-password').value;
+
+  if (!currentPassword) {
+    $('change-error-text').textContent = 'Kata sandi saat ini wajib diisi.';
+    $('change-error').hidden = false;
+    return;
+  }
+  if (!newPassword || newPassword.length < 8) {
+    $('change-error-text').textContent = 'Kata sandi baru minimal harus 8 karakter.';
+    $('change-error').hidden = false;
+    return;
+  }
+  if (newPassword !== confirmNewPassword) {
+    $('change-error-text').textContent = 'Konfirmasi kata sandi baru tidak cocok.';
+    $('change-error').hidden = false;
+    return;
+  }
+
+  setButtonBusy($('change-submit'), true, 'Menyimpan…');
+  try {
+    const res = await api('changePassword', {
+      token: state.session.token,
+      currentPassword,
+      newPassword,
+    });
+    closeDialog($('change-password-dialog'));
+    showToast(res && res.message ? res.message : 'Kata sandi berhasil diperbarui.', 'success');
+  } catch (error) {
+    $('change-error-text').textContent = error.message || 'Gagal mengubah kata sandi.';
+    $('change-error').hidden = false;
+  } finally {
+    setButtonBusy($('change-submit'), false);
+  }
+}
+
 function handleLogout() {
   clearStoredSession();
   state.session = null;
@@ -1319,6 +1528,8 @@ function handleLogout() {
   closeDialog($('txn-dialog'));
   closeDialog($('delete-dialog'));
   closeDialog($('budget-dialog'));
+  closeDialog($('reset-password-dialog'));
+  closeDialog($('change-password-dialog'));
   $('txn-list').replaceChildren();
   $('txn-empty').hidden = true;
   $('txn-count').textContent = '';
@@ -1774,9 +1985,27 @@ function registerServiceWorker() {
 /* ---------- Wiring & Event Listeners ---------- */
 
 function bindEvents() {
+  // Theme toggle buttons
+  document.querySelectorAll('.theme-toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', toggleTheme);
+  });
+
+  // Auth tabs & forms
+  $('tab-login').addEventListener('click', () => switchAuthTab('login'));
+  $('tab-register').addEventListener('click', () => switchAuthTab('register'));
+  $('switch-to-register').addEventListener('click', () => switchAuthTab('register'));
+  $('switch-to-login').addEventListener('click', () => switchAuthTab('login'));
+
   $('login-form').addEventListener('submit', handleLogin);
+  $('register-form').addEventListener('submit', handleRegister);
   $('logout-button').addEventListener('click', handleLogout);
   $('retry-button').addEventListener('click', loadTransactions);
+
+  // Forgot password & Change password
+  $('forgot-password-link').addEventListener('click', openResetPasswordDialog);
+  $('reset-password-form').addEventListener('submit', handleResetPasswordSubmit);
+  $('open-change-pass-btn').addEventListener('click', openChangePasswordDialog);
+  $('change-password-form').addEventListener('submit', handleChangePasswordSubmit);
 
   $('add-button').addEventListener('click', () => openTransactionDialog(null));
   $('empty-add-button').addEventListener('click', () => openTransactionDialog(null));
@@ -1843,6 +2072,8 @@ function bindEvents() {
       closeDialog($('txn-dialog'));
       closeDialog($('delete-dialog'));
       closeDialog($('budget-dialog'));
+      closeDialog($('reset-password-dialog'));
+      closeDialog($('change-password-dialog'));
     });
   });
 
@@ -1892,6 +2123,7 @@ function restoreSession() {
 }
 
 function init() {
+  initTheme();
   bindEvents();
   updateOnlineStatus();
 
@@ -1946,6 +2178,11 @@ function runSelfTests() {
   check('makanan berstatus waspada (90%)', budgetStatus.items.find((i) => i.category === 'Makanan').status === 'warning');
   check('transportasi berstatus exceeded (120%)', budgetStatus.items.find((i) => i.category === 'Transportasi').status === 'exceeded');
 
+  // Username validation check
+  check('validasi username normal', /^[a-z0-9._-]{3,64}$/.test('budi_santoso'));
+  check('validasi username tolak spasi', !/^[a-z0-9._-]{3,64}$/.test('budi santoso'));
+  check('validasi username tolak pendek', !/^[a-z0-9._-]{3,64}$/.test('ab'));
+
   console.table(results);
   const failed = results.filter((result) => !result.pass);
   if (failed.length) {
@@ -1954,6 +2191,14 @@ function runSelfTests() {
     console.info('FinTrack self-test lulus: ' + results.length + '/' + results.length);
   }
   return results;
+}
+
+window.fintrackSelfTest = runSelfTests;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
 }
 
 window.fintrackSelfTest = runSelfTests;

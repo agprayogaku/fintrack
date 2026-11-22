@@ -2,7 +2,7 @@
 
 /* FinTrack service worker — caches the app shell only, never API responses. */
 
-const CACHE_NAME = 'fintrack-shell-v2';
+const CACHE_NAME = 'fintrack-shell-v3';
 const APP_SHELL = [
   './',
   './index.html',

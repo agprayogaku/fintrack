@@ -71,6 +71,17 @@
     <symbol id="i-cloud-off" viewBox="0 0 24 24">
       <path d="m2 2 20 20M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.954-.442M21.774 16.24A4.5 4.5 0 0 0 16.5 10c-.722 0-1.4.11-2.035.313M9.932 4.244A7 7 0 0 1 16 10"/>
     </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+      <path d="m21 2-2 2m-1.5 1.5L14 9l-2-2-4 4 2 2-3 3 1.5 1.5L7 19l2 2 1.5-1.5L9 18l3-3 2 2 4-4-2-2 3.5-3.5Z"/>
+      <circle cx="7.5" cy="16.5" r="1.5"/>
+    </symbol>
   </svg>
 
   <div id="offline-banner" class="offline-banner" role="status" hidden>
@@ -81,43 +92,98 @@
     <button class="btn btn-outline btn-sm offline-sync-btn" id="banner-sync-btn" type="button" hidden>Sinkronkan sekarang</button>
   </div>
 
-  <!-- Login View -->
+  <!-- Login & Register View -->
   <section id="login-view" class="auth-view">
     <div class="card auth-card">
-      <div class="brand auth-brand">
-        <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg></span>
-        <div>
-          <p class="brand-name">FinTrack</p>
-          <p class="brand-subtitle">Keuangan Pribadi</p>
+      <div class="auth-card-top">
+        <div class="brand auth-brand">
+          <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg></span>
+          <div>
+            <p class="brand-name">FinTrack</p>
+            <p class="brand-subtitle">Keuangan Pribadi</p>
+          </div>
         </div>
+        <button class="btn btn-ghost btn-icon theme-toggle-btn auth-theme-toggle" type="button" aria-label="Ganti tema gelap/terang" title="Ganti tema">
+          <svg class="icon theme-icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+          <svg class="icon theme-icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+        </button>
       </div>
 
-      <div class="card-header">
-        <h1 class="card-title">Masuk</h1>
-        <p class="card-description">Masuk ke akun Anda untuk mengelola keuangan pribadi.</p>
+      <!-- Tab Switcher Masuk / Daftar -->
+      <div class="auth-tabs" role="tablist" aria-label="Pilihan autentikasi">
+        <button type="button" class="auth-tab-btn active" id="tab-login" role="tab" aria-selected="true">Masuk</button>
+        <button type="button" class="auth-tab-btn" id="tab-register" role="tab" aria-selected="false">Daftar Akun</button>
       </div>
 
-      <form id="login-form" class="card-content form-stack" novalidate>
-        <div class="field">
-          <label class="label" for="login-username">Nama pengguna</label>
-          <input class="input" id="login-username" name="username" type="text" autocomplete="username"
-                 autocapitalize="none" spellcheck="false" required>
+      <!-- Panel Form Masuk (Login) -->
+      <div id="login-panel">
+        <div class="card-header auth-header">
+          <h1 class="card-title">Masuk ke Akun</h1>
+          <p class="card-description">Kelola catatan dan target keuangan pribadi Anda.</p>
         </div>
 
-        <div class="field">
-          <label class="label" for="login-password">Kata sandi</label>
-          <input class="input" id="login-password" name="password" type="password"
-                 autocomplete="current-password" required>
+        <form id="login-form" class="card-content form-stack" novalidate>
+          <div class="field">
+            <label class="label" for="login-username">Nama pengguna</label>
+            <input class="input" id="login-username" name="username" type="text" autocomplete="username"
+                   autocapitalize="none" spellcheck="false" placeholder="username" required>
+          </div>
+
+          <div class="field">
+            <div class="field-label-row">
+              <label class="label" for="login-password">Kata sandi</label>
+              <button class="btn-link-sm" id="forgot-password-link" type="button">Lupa kata sandi?</button>
+            </div>
+            <input class="input" id="login-password" name="password" type="password"
+                   autocomplete="current-password" placeholder="••••••••" required>
+          </div>
+
+          <div id="login-error" class="alert alert-destructive" role="alert" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+            <span id="login-error-text"></span>
+          </div>
+
+          <button class="btn btn-primary btn-block" id="login-submit" type="submit">Masuk</button>
+          <p class="auth-switch-prompt">Belum punya akun? <button type="button" class="btn-link" id="switch-to-register">Daftar di sini</button></p>
+        </form>
+      </div>
+
+      <!-- Panel Form Daftar (Register) -->
+      <div id="register-panel" hidden>
+        <div class="card-header auth-header">
+          <h1 class="card-title">Buat Akun Baru</h1>
+          <p class="card-description">Mulai kelola keuangan Anda secara aman dan mandiri.</p>
         </div>
 
-        <div id="login-error" class="alert alert-destructive" role="alert" hidden>
-          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
-          <span id="login-error-text"></span>
-        </div>
+        <form id="register-form" class="card-content form-stack" novalidate>
+          <div class="field">
+            <label class="label" for="register-username">Nama pengguna</label>
+            <input class="input" id="register-username" name="username" type="text" autocomplete="username"
+                   autocapitalize="none" spellcheck="false" placeholder="Contoh: budi_s" required>
+            <p class="field-description">3–64 karakter (huruf, angka, titik, strip, underscore tanpa spasi).</p>
+          </div>
 
-        <button class="btn btn-primary btn-block" id="login-submit" type="submit">Masuk</button>
-        <p class="field-description">Gunakan akun yang dibuat oleh administrator.</p>
-      </form>
+          <div class="field">
+            <label class="label" for="register-password">Kata sandi</label>
+            <input class="input" id="register-password" name="password" type="password"
+                   autocomplete="new-password" placeholder="Minimal 8 karakter" required>
+          </div>
+
+          <div class="field">
+            <label class="label" for="register-confirm">Konfirmasi kata sandi</label>
+            <input class="input" id="register-confirm" name="confirmPassword" type="password"
+                   autocomplete="new-password" placeholder="Ulangi kata sandi" required>
+          </div>
+
+          <div id="register-error" class="alert alert-destructive" role="alert" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+            <span id="register-error-text"></span>
+          </div>
+
+          <button class="btn btn-primary btn-block" id="register-submit" type="submit">Daftar & Masuk</button>
+          <p class="auth-switch-prompt">Sudah punya akun? <button type="button" class="btn-link" id="switch-to-login">Masuk sekarang</button></p>
+        </form>
+      </div>
     </div>
   </section>
 
@@ -137,9 +203,16 @@
             <svg class="icon sync-icon" aria-hidden="true"><use href="#i-sync"></use></svg>
             <span id="sync-button-text">Sinkronkan</span>
           </button>
+          <button class="btn btn-outline btn-sm btn-icon theme-toggle-btn" type="button" aria-label="Ganti tema gelap/terang" title="Ganti tema">
+            <svg class="icon theme-icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+            <svg class="icon theme-icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+          </button>
+          <button class="btn btn-outline btn-sm btn-icon" id="open-change-pass-btn" type="button" aria-label="Ubah kata sandi" title="Ubah kata sandi">
+            <svg class="icon" aria-hidden="true"><use href="#i-key"></use></svg>
+          </button>
           <button class="btn btn-outline btn-sm" id="logout-button" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
-            <span>Keluar</span>
+            <span class="header-action-label">Keluar</span>
           </button>
         </div>
       </div>
@@ -181,7 +254,7 @@
           </button>
         </div>
         <div class="card-content" id="budget-content">
-          <!-- Populated dynamically: budget overview + category items -->
+          <!-- Populated dynamically -->
         </div>
       </section>
 
@@ -204,7 +277,7 @@
           </div>
         </div>
         <div class="card-content" id="chart-content">
-          <!-- Rendered dynamically: Pure SVG bar or donut chart -->
+          <!-- Rendered dynamically -->
         </div>
       </section>
 
@@ -385,7 +458,7 @@
       <div class="dialog-body form-stack">
         <p class="field-description">Target anggaran berlaku untuk total pengeluaran per bulan kalender. Masukkan angka bulat (Rp), atau kosongkan / isi 0 untuk menonaktifkan.</p>
         <div id="budget-rows-container" class="form-stack budget-rows-container">
-          <!-- Populated dynamically with category fields -->
+          <!-- Populated dynamically -->
         </div>
         <div>
           <button class="btn btn-outline btn-sm" id="budget-add-row-btn" type="button">
@@ -402,6 +475,90 @@
       <div class="dialog-footer">
         <button class="btn btn-outline" type="button" data-close-dialog>Batal</button>
         <button class="btn btn-primary" id="budget-submit" type="submit">Simpan Anggaran</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Reset Password Dialog (Lupa Kata Sandi) -->
+  <dialog id="reset-password-dialog" class="dialog" aria-labelledby="reset-dialog-title">
+    <form id="reset-password-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 class="dialog-title" id="reset-dialog-title">Reset Kata Sandi</h2>
+          <p class="dialog-description">Masukkan nama pengguna dan kata sandi baru Anda.</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" type="button" data-close-dialog aria-label="Tutup">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="dialog-body form-stack">
+        <div class="field">
+          <label class="label" for="reset-username">Nama pengguna</label>
+          <input class="input" id="reset-username" name="username" type="text" autocapitalize="none" spellcheck="false" placeholder="username akun Anda" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="reset-new-password">Kata sandi baru</label>
+          <input class="input" id="reset-new-password" name="newPassword" type="password" placeholder="Minimal 8 karakter" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="reset-confirm-password">Konfirmasi kata sandi baru</label>
+          <input class="input" id="reset-confirm-password" name="confirmNewPassword" type="password" placeholder="Ulangi kata sandi baru" required>
+        </div>
+
+        <div id="reset-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="reset-error-text"></span>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-outline" type="button" data-close-dialog>Batal</button>
+        <button class="btn btn-primary" id="reset-submit" type="submit">Reset Kata Sandi</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Change Password Dialog (Ubah Kata Sandi saat Login) -->
+  <dialog id="change-password-dialog" class="dialog" aria-labelledby="change-dialog-title">
+    <form id="change-password-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <h2 class="dialog-title" id="change-dialog-title">Ubah Kata Sandi</h2>
+          <p class="dialog-description">Perbarui kata sandi akun Anda saat ini.</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" type="button" data-close-dialog aria-label="Tutup">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="dialog-body form-stack">
+        <div class="field">
+          <label class="label" for="change-current-password">Kata sandi saat ini</label>
+          <input class="input" id="change-current-password" name="currentPassword" type="password" placeholder="Kata sandi lama" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="change-new-password">Kata sandi baru</label>
+          <input class="input" id="change-new-password" name="newPassword" type="password" placeholder="Minimal 8 karakter" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="change-confirm-password">Konfirmasi kata sandi baru</label>
+          <input class="input" id="change-confirm-password" name="confirmNewPassword" type="password" placeholder="Ulangi kata sandi baru" required>
+        </div>
+
+        <div id="change-error" class="alert alert-destructive" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="change-error-text"></span>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-outline" type="button" data-close-dialog>Batal</button>
+        <button class="btn btn-primary" id="change-submit" type="submit">Simpan Kata Sandi</button>
       </div>
     </form>
   </dialog>
