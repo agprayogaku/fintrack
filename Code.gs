@@ -740,8 +740,32 @@ function readTransactions_(userId) {
   return transactions;
 }
 
+function formatRupiah_(amount) {
+  return 'Rp ' + Math.trunc(amount || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function getUserCashBalance_(userId, excludeTxnId) {
+  const transactions = listTransactions_(userId);
+  let balance = 0;
+  transactions.forEach(function (t) {
+    if (excludeTxnId && String(t.id) === String(excludeTxnId)) return;
+    const amt = Math.trunc(Number(t.amount) || 0);
+    if (t.type === 'income') balance += amt;
+    else balance -= amt;
+  });
+  return balance;
+}
+
 function addTransaction_(userId, payload) {
   const input = validateTransactionInput_(payload);
+
+  if (input.type === 'expense') {
+    const currentBalance = getUserCashBalance_(userId);
+    if (input.amount > currentBalance) {
+      throw userError_('Pengeluaran melebihi sisa saldo kas yang tersedia (' + formatRupiah_(Math.max(0, currentBalance)) + ').');
+    }
+  }
+
   const sheet = getSheet_(SHEET_TRANSACTIONS);
   const now = new Date().toISOString();
   const transaction = {
@@ -769,6 +793,17 @@ function updateTransaction_(userId, payload) {
   const match = findTransactionRow_(sheet, userId, id);
   if (!match) throw userError_('Transaksi tidak ditemukan.');
 
+  const balanceWithoutThis = getUserCashBalance_(userId, id);
+  if (input.type === 'expense') {
+    if (input.amount > balanceWithoutThis) {
+      throw userError_('Pengeluaran melebihi sisa saldo kas yang tersedia (' + formatRupiah_(Math.max(0, balanceWithoutThis)) + ').');
+    }
+  } else if (input.type === 'income') {
+    if (balanceWithoutThis + input.amount < 0) {
+      throw userError_('Pengurangan pemasukan ini akan membuat saldo kas menjadi negatif.');
+    }
+  }
+
   const now = new Date().toISOString();
   const transaction = {
     id: id,
@@ -793,6 +828,14 @@ function deleteTransaction_(userId, payload) {
   const sheet = getSheet_(SHEET_TRANSACTIONS);
   const match = findTransactionRow_(sheet, userId, id);
   if (!match) throw userError_('Transaksi tidak ditemukan.');
+
+  const existingTxn = rowToTransaction_(match.values);
+  if (existingTxn.type === 'income') {
+    const balanceWithoutThis = getUserCashBalance_(userId, id);
+    if (balanceWithoutThis < 0) {
+      throw userError_('Menghapus pemasukan ini akan membuat saldo kas menjadi negatif.');
+    }
+  }
 
   sheet.deleteRow(match.rowNumber);
   return { id: id };
@@ -836,19 +879,26 @@ function validateTransactionInput_(payload) {
     throw userError_('Deskripsi harus 1–120 karakter.');
   }
 
-  const category = String(value.category || '').trim();
-  if (category.length < 1 || category.length > 40) {
-    throw userError_('Kategori harus 1–40 karakter.');
+  const type = String(value.type || '');
+  if (type !== 'income' && type !== 'expense') {
+    throw userError_('Jenis transaksi tidak valid.');
+  }
+
+  let category = String(value.category || '').trim();
+  if (type === 'income') {
+    // Model Celengan: Pemasukan langsung masuk saldo kas tanpa beban pembagian kategori
+    if (!category) category = '-';
+  } else {
+    // Pengeluaran: Wajib kategori (bisa 'Lainnya' atau kategori anggaran yang dipilih)
+    if (!category) category = 'Lainnya';
+    if (category.length > 40) {
+      throw userError_('Kategori pengeluaran maksimal 40 karakter.');
+    }
   }
 
   const amount = Number(value.amount);
   if (!Number.isSafeInteger(amount) || amount <= 0) {
     throw userError_('Jumlah harus berupa angka bulat lebih dari 0.');
-  }
-
-  const type = String(value.type || '');
-  if (type !== 'income' && type !== 'expense') {
-    throw userError_('Jenis transaksi tidak valid.');
   }
 
   return {
@@ -889,20 +939,19 @@ function buildSummary_(transactions) {
 
   transactions.forEach(function (transaction) {
     const amount = Math.trunc(Number(transaction.amount) || 0);
-    const category = transaction.category || 'Tanpa kategori';
-    if (!categories.has(category)) {
-      categories.set(category, { name: category, income: 0, expense: 0, total: 0 });
-    }
-    const bucket = categories.get(category);
 
     if (transaction.type === 'income') {
       totalIncome += amount;
-      bucket.income += amount;
     } else {
       totalExpenses += amount;
+      const category = transaction.category || 'Lainnya';
+      if (!categories.has(category)) {
+        categories.set(category, { name: category, income: 0, expense: 0, total: 0 });
+      }
+      const bucket = categories.get(category);
       bucket.expense += amount;
+      bucket.total += amount;
     }
-    bucket.total += amount;
   });
 
   return {
@@ -946,7 +995,8 @@ function getBudgets_(userId) {
     if (String(row[0]) === userId) {
       const category = unsanitizeText_(row[1]);
       const amount = Number(row[2]);
-      if (category && Number.isFinite(amount) && amount > 0) {
+      // Target anggaran khusus pengeluaran (abaikan '-' atau 'Pendapatan', terima >= 0 untuk kategori fleksibel)
+      if (category && category !== '-' && category !== 'Pendapatan' && Number.isFinite(amount) && amount >= 0) {
         budgets[category] = Math.trunc(amount);
       }
     }
@@ -980,7 +1030,8 @@ function saveBudgets_(userId, payload) {
   Object.keys(inputBudgets).forEach(function (rawCategory) {
     const category = String(rawCategory || '').trim();
     const amount = Number(inputBudgets[rawCategory]);
-    if (category.length >= 1 && category.length <= 40 && Number.isFinite(amount) && amount > 0) {
+    // Target anggaran hanya untuk kategori pengeluaran (abaikan '-' dan 'Pendapatan', terima >= 0 untuk kategori fleksibel)
+    if (category.length >= 1 && category.length <= 40 && category !== '-' && category !== 'Pendapatan' && Number.isFinite(amount) && amount >= 0) {
       const intAmount = Math.trunc(amount);
       sanitizedBudgets[category] = intAmount;
       newRows.push([
@@ -1151,13 +1202,13 @@ function runSelfTests() {
   })());
 
   const summary = buildSummary_([
-    { category: 'Gaji', amount: 5000000, type: 'income' },
+    { category: '-', amount: 5000000, type: 'income' },
     { category: 'Makanan', amount: 35000, type: 'expense' },
   ]);
   check('ringkasan pemasukan', summary.totalIncome === 5000000);
   check('ringkasan pengeluaran', summary.totalExpenses === 35000);
   check('ringkasan bersih', summary.net === 4965000);
-  check('kategori terkelompok', summary.categories.length === 2);
+  check('kategori pengeluaran terkelompok', summary.categories.length === 1 && summary.categories[0].name === 'Makanan');
 
   // Pengujian FinTrack v1.1
   check('proteksi formula budget', protectText_('=SUM(A1:A10)') === "'=SUM(A1:A10)");

@@ -136,7 +136,14 @@ function getCachedBudgets(userId) {
     const raw = localStorage.getItem(getBudgetsKey(userId));
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    if (typeof parsed !== 'object' || parsed === null) return {};
+    const cleaned = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (k && k !== '-' && k !== 'Pendapatan' && Number(v) >= 0) {
+        cleaned[k] = Math.trunc(Number(v));
+      }
+    }
+    return cleaned;
   } catch (e) {
     return {};
   }
@@ -144,7 +151,15 @@ function getCachedBudgets(userId) {
 
 function setCachedBudgets(userId, budgets) {
   try {
-    localStorage.setItem(getBudgetsKey(userId), JSON.stringify(budgets || {}));
+    const cleaned = {};
+    if (budgets && typeof budgets === 'object') {
+      for (const [k, v] of Object.entries(budgets)) {
+        if (k && k !== '-' && k !== 'Pendapatan' && Number(v) >= 0) {
+          cleaned[k] = Math.trunc(Number(v));
+        }
+      }
+    }
+    localStorage.setItem(getBudgetsKey(userId), JSON.stringify(cleaned));
   } catch (e) {}
 }
 
@@ -234,20 +249,19 @@ function summarizeTransactions(transactions) {
 
   transactions.forEach((txn) => {
     const amount = Math.trunc(Number(txn.amount) || 0);
-    const category = txn.category || 'Tanpa kategori';
-    if (!categories.has(category)) {
-      categories.set(category, { name: category, income: 0, expense: 0, total: 0 });
-    }
-    const bucket = categories.get(category);
 
     if (txn.type === 'income') {
       totalIncome += amount;
-      bucket.income += amount;
     } else {
       totalExpenses += amount;
+      const category = txn.category || 'Lainnya';
+      if (!categories.has(category)) {
+        categories.set(category, { name: category, income: 0, expense: 0, total: 0 });
+      }
+      const bucket = categories.get(category);
       bucket.expense += amount;
+      bucket.total += amount;
     }
-    bucket.total += amount;
   });
 
   return {
@@ -534,8 +548,19 @@ async function loadTransactions() {
       setCachedTransactions(userId, state.transactions);
 
       if (budgetsData && typeof budgetsData === 'object') {
-        state.budgets = budgetsData;
+        const cleanBudgets = {};
+        for (const [k, v] of Object.entries(budgetsData)) {
+          if (k && k !== '-' && k !== 'Pendapatan' && Number(v) >= 0) {
+            cleanBudgets[k] = Math.trunc(Number(v));
+          }
+        }
+        state.budgets = cleanBudgets;
         setCachedBudgets(userId, state.budgets);
+
+        // Jika server sebelumnya menyimpan kategori pemasukan '-' atau 'Pendapatan', sinkronkan pembersihan ke server
+        if (budgetsData['-'] !== undefined || budgetsData['Pendapatan'] !== undefined) {
+          api('saveBudgets', { token: state.session.token, budgets: cleanBudgets }).catch(() => {});
+        }
       }
       if (settingsData && typeof settingsData === 'object') {
         state.settings = settingsData;
@@ -620,7 +645,6 @@ function renderAll() {
   renderSummary();
   renderBudgets();
   renderCharts();
-  renderCategories();
   renderTransactions();
   renderScope();
 }
@@ -641,83 +665,93 @@ function renderScope() {
   $('summary-scope').textContent = hasActiveFilters() ? 'Sesuai filter' : 'Semua transaksi';
 }
 
-function renderCategories() {
-  const container = $('category-list');
-  container.replaceChildren();
-
-  const summary = summarizeTransactions(visibleTransactions());
-  if (!summary.categories.length) {
-    container.append(createElement('p', 'category-empty', 'Belum ada data kategori.'));
-    return;
-  }
-
-  const maxTotal = Math.max(...summary.categories.map((category) => category.total), 1);
-
-  summary.categories.forEach((category) => {
-    const row = createElement('div', 'category-row');
-
-    const head = createElement('div', 'category-row-head');
-    head.append(
-      createElement('span', 'category-name', category.name),
-      createElement('span', 'category-total', formatRupiah(category.total))
-    );
-
-    const progress = createElement('div', 'progress');
-    progress.setAttribute('role', 'progressbar');
-    progress.setAttribute('aria-label', 'Porsi ' + category.name);
-    progress.setAttribute('aria-valuemin', '0');
-    progress.setAttribute('aria-valuemax', '100');
-
-    const percentage = Math.max(2, Math.round((category.total / maxTotal) * 100));
-    progress.setAttribute('aria-valuenow', String(percentage));
-
-    const bar = createElement('div', 'progress-bar');
-    bar.style.width = percentage + '%';
-    progress.append(bar);
-
-    const meta = createElement('div', 'category-meta');
-    if (category.income > 0) {
-      meta.append(createElement('span', 'income-text', 'Masuk +' + formatRupiah(category.income)));
-    }
-    if (category.expense > 0) {
-      meta.append(createElement('span', 'expense-text', 'Keluar −' + formatRupiah(category.expense)));
-    }
-    if (!category.income && !category.expense) {
-      meta.append(createElement('span', null, 'Tidak ada transaksi.'));
-    }
-
-    row.append(head, progress, meta);
-    container.append(row);
-  });
-}
-
 function renderCategoryOptions() {
-  const categories = Array.from(new Set(
-    state.transactions
-      .map((txn) => txn.category)
-      .filter((category) => category && category.length)
-  )).sort((a, b) => a.localeCompare(b, CONFIG.LOCALE));
+  // Hanya kategori pengeluaran dan kategori anggaran yang dimunculkan pada filter
+  const expenseCategories = Array.from(new Set([
+    ...state.transactions.filter((t) => t.type === 'expense').map((t) => t.category).filter((c) => c && c !== '-' && c !== 'Pendapatan'),
+    ...getBudgetCategories(),
+  ])).sort((a, b) => {
+    if (a === 'Lainnya') return 1;
+    if (b === 'Lainnya') return -1;
+    return a.localeCompare(b, CONFIG.LOCALE);
+  });
 
   const select = $('filter-category');
   select.replaceChildren(createElement('option', null, 'Semua kategori'));
   select.firstChild.value = '';
 
-  categories.forEach((category) => {
+  expenseCategories.forEach((category) => {
     const option = createElement('option', null, category);
     option.value = category;
     select.append(option);
   });
 
-  const nextCategory = categories.includes(state.filters.category) ? state.filters.category : '';
+  const nextCategory = expenseCategories.includes(state.filters.category) ? state.filters.category : '';
   select.value = nextCategory;
   state.filters.category = nextCategory;
 
-  const suggestions = $('category-suggestions');
-  suggestions.replaceChildren();
-  categories.forEach((category) => {
-    const option = document.createElement('option');
-    option.value = category;
-    suggestions.append(option);
+  updateTxnCategoryOptions();
+}
+
+function updateTxnCategoryOptions(selectedCategory = '') {
+  const select = $('txn-category');
+  if (!select) return;
+
+  const currentType = $('txn-type') ? $('txn-type').value : 'expense';
+  const categoryField = $('txn-category-field');
+
+  if (currentType === 'income') {
+    if (categoryField) categoryField.hidden = true;
+    select.required = false;
+    select.value = '';
+    return;
+  }
+
+  // Type is 'expense': show category dropdown with budget categories
+  if (categoryField) categoryField.hidden = false;
+  select.required = true;
+
+  const budgetCategories = getBudgetCategories();
+  select.replaceChildren();
+
+  const defaultOption = createElement('option', null, 'Pilih kategori anggaran…');
+  defaultOption.value = '';
+  select.append(defaultOption);
+
+  budgetCategories.forEach((cat) => {
+    const option = createElement('option', null, cat);
+    option.value = cat;
+    select.append(option);
+  });
+
+  // If a category was passed (or editing existing) and not in budget categories, still allow it as an option
+  if (selectedCategory && !budgetCategories.includes(selectedCategory)) {
+    const customOption = createElement('option', null, selectedCategory);
+    customOption.value = selectedCategory;
+    select.append(customOption);
+  }
+
+  const hint = $('txn-category-hint');
+  if (hint) {
+    hint.textContent = 'Pilih kategori anggaran untuk pengeluaran ini (tersedia opsi "Lainnya").';
+  }
+
+  if (selectedCategory) {
+    select.value = selectedCategory;
+  }
+}
+
+function getBudgetCategories() {
+  const uid = state.session && state.session.user ? state.session.user.id : null;
+  const budgets = uid ? getBudgets(uid) : {};
+  const list = Object.keys(budgets || {}).filter((cat) => cat && cat !== '-' && cat !== 'Pendapatan' && Number(budgets[cat]) >= 0);
+  if (!list.includes('Lainnya')) {
+    list.push('Lainnya');
+  }
+  return list.sort((a, b) => {
+    if (a === 'Lainnya') return 1;
+    if (b === 'Lainnya') return -1;
+    return a.localeCompare(b, CONFIG.LOCALE);
   });
 }
 
@@ -757,8 +791,13 @@ function renderTransactions() {
       meta.append(pendingBadge);
     }
 
-    meta.append(createElement('span', null, txn.category || 'Tanpa kategori'));
-    meta.append(createElement('span', null, '·'));
+    // Hanya pengeluaran yang menampilkan kategori anggaran (pemasukan bertindak sebagai celengan tanpa kategori)
+    if (txn.type === 'expense') {
+      const categoryLabel = txn.category && txn.category !== '-' ? txn.category : 'Lainnya';
+      meta.append(createElement('span', null, categoryLabel));
+      meta.append(createElement('span', null, '·'));
+    }
+
     meta.append(createElement('span', null, formatDate(txn.date)));
     main.append(meta);
 
@@ -784,14 +823,40 @@ function renderTransactions() {
 /* ---------- Target Anggaran (Budgeting) ---------- */
 
 function getBudgets(userId) {
-  if (state.budgets && typeof state.budgets === 'object' && Object.keys(state.budgets).length > 0) {
-    return state.budgets;
+  let source = (state.budgets && typeof state.budgets === 'object' && Object.keys(state.budgets).length > 0)
+    ? state.budgets
+    : getCachedBudgets(userId);
+
+  const cleaned = {};
+  let changed = false;
+  for (const [k, v] of Object.entries(source || {})) {
+    if (k && k !== '-' && k !== 'Pendapatan' && Number(v) >= 0) {
+      cleaned[k] = Math.trunc(Number(v));
+    } else {
+      changed = true;
+    }
   }
-  return getCachedBudgets(userId);
+
+  if (changed) {
+    state.budgets = cleaned;
+    setCachedBudgets(userId, cleaned);
+    if (state.session && state.session.token && navigator.onLine) {
+      api('saveBudgets', { token: state.session.token, budgets: cleaned }).catch(() => {});
+    }
+  } else {
+    state.budgets = cleaned;
+  }
+  return state.budgets;
 }
 
 function saveBudgets(userId, budgets) {
-  state.budgets = budgets || {};
+  const cleaned = {};
+  for (const [k, v] of Object.entries(budgets || {})) {
+    if (k && k !== '-' && k !== 'Pendapatan' && Number(v) >= 0) {
+      cleaned[k] = Math.trunc(Number(v));
+    }
+  }
+  state.budgets = cleaned;
   setCachedBudgets(userId, state.budgets);
 }
 
@@ -801,34 +866,51 @@ function calculateBudgetStatus(transactions, budgets, referenceDate) {
   const [year, month] = currentMonthKey.split('-').map(Number);
   const monthName = monthFormatter.format(new Date(year, month - 1, 1));
 
-  // Filter transactions for this month that are expenses
+  // Filter transaksi bulan ini khusus pengeluaran (pemasukan tidak memiliki kategori anggaran)
   const monthExpenses = transactions.filter((t) => t.type === 'expense' && String(t.date || '').startsWith(currentMonthKey));
 
   const spentByCategory = new Map();
   monthExpenses.forEach((t) => {
-    const cat = t.category || 'Tanpa kategori';
+    let cat = t.category || 'Lainnya';
+    if (cat === '-' || cat === 'Pendapatan') cat = 'Lainnya';
     spentByCategory.set(cat, (spentByCategory.get(cat) || 0) + Math.trunc(Number(t.amount) || 0));
   });
 
-  const categoriesWithBudget = Object.keys(budgets || {}).filter((cat) => Number(budgets[cat]) > 0);
+  const categoriesWithBudget = Object.keys(budgets || {}).filter((cat) => {
+    return cat && cat !== '-' && cat !== 'Pendapatan' && Number(budgets[cat]) >= 0;
+  });
 
   let totalBudget = 0;
+  let totalFulfilled = 0;
   let totalSpent = 0;
 
   const items = categoriesWithBudget.map((category) => {
     const budget = Math.trunc(Number(budgets[category]) || 0);
     const spent = spentByCategory.get(category) || 0;
-    const remaining = budget - spent;
-    const percent = Math.round((spent / budget) * 100);
+    const remaining = Math.max(0, budget - spent);
+    const percent = budget > 0 ? Math.round((spent / budget) * 100) : (spent > 0 ? 100 : 0);
 
-    let status = 'normal';
-    if (percent >= 100) {
-      status = 'exceeded';
-    } else if (percent >= 75) {
-      status = 'warning';
+    let status = 'unfulfilled';
+    let statusText = 'Perlu Dilunasi (0%)';
+
+    if (budget === 0) {
+      status = 'flexible';
+      statusText = 'Fleksibel';
+    } else if (spent >= budget) {
+      status = 'fulfilled';
+      statusText = spent === budget ? 'Lunas / Terpenuhi' : 'Lunas (+' + formatRupiah(spent - budget) + ')';
+    } else if (spent > 0) {
+      status = 'partial';
+      statusText = 'Sebagian (' + percent + '%)';
+    } else {
+      status = 'unfulfilled';
+      statusText = 'Perlu Dilunasi (0%)';
     }
 
-    totalBudget += budget;
+    if (budget > 0) {
+      totalBudget += budget;
+      totalFulfilled += Math.min(spent, budget);
+    }
     totalSpent += spent;
 
     return {
@@ -838,19 +920,26 @@ function calculateBudgetStatus(transactions, budgets, referenceDate) {
       remaining,
       percent,
       status,
+      statusText,
     };
-  }).sort((a, b) => b.percent - a.percent);
+  }).sort((a, b) => {
+    const rank = { unfulfilled: 0, partial: 1, fulfilled: 2, flexible: 3 };
+    const diff = (rank[a.status] || 0) - (rank[b.status] || 0);
+    if (diff !== 0) return diff;
+    return a.category.localeCompare(b.category, CONFIG.LOCALE);
+  });
 
-  const overallPercent = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-  let overallStatus = 'normal';
-  if (overallPercent >= 100) overallStatus = 'exceeded';
-  else if (overallPercent >= 75) overallStatus = 'warning';
+  const overallPercent = totalBudget > 0 ? Math.round((totalFulfilled / totalBudget) * 100) : 0;
+  let overallStatus = 'unfulfilled';
+  if (overallPercent >= 100) overallStatus = 'fulfilled';
+  else if (overallPercent > 0) overallStatus = 'partial';
 
   return {
     currentMonthKey,
     monthName,
     items,
     totalBudget,
+    totalFulfilled,
     totalSpent,
     overallPercent,
     overallStatus,
@@ -871,8 +960,8 @@ function renderBudgets() {
     const empty = createElement('div', 'budget-empty');
     empty.append(
       createSvgIcon('target', 'icon icon-lg'),
-      createElement('p', null, 'Belum ada target anggaran bulanan yang ditentukan.'),
-      createElement('p', 'field-description', 'Buat target pengeluaran per kategori untuk mengontrol keuangan Anda.'),
+      createElement('p', null, 'Belum ada target pemenuhan bulanan yang ditentukan.'),
+      createElement('p', 'field-description', 'Buat target pengeluaran atau cicilan per kategori untuk memastikan kewajiban bulanan Anda terpenuhi.'),
       (() => {
         const btn = createElement('button', 'btn btn-outline btn-sm', 'Atur Target Sekarang');
         btn.type = 'button';
@@ -887,10 +976,17 @@ function renderBudgets() {
   // Summary box
   const summaryBox = createElement('div', 'budget-summary-box');
   const summaryMeta = createElement('div', 'budget-summary-meta');
-  summaryMeta.append(
-    createElement('span', null, `Total Anggaran Terpakai: ${status.overallPercent}%`),
-    createElement('span', null, `${formatRupiah(status.totalSpent)} / ${formatRupiah(status.totalBudget)}`)
-  );
+  if (status.totalBudget > 0) {
+    summaryMeta.append(
+      createElement('span', null, `Pemenuhan Kewajiban: ${status.overallPercent}%`),
+      createElement('span', null, `${formatRupiah(status.totalFulfilled)} / ${formatRupiah(status.totalBudget)}`)
+    );
+  } else {
+    summaryMeta.append(
+      createElement('span', null, 'Target Pemenuhan & Anggaran'),
+      createElement('span', null, `${status.items.length} kategori aktif`)
+    );
+  }
 
   const progress = createElement('div', 'progress');
   const progressBar = createElement('div', `progress-bar budget-bar-${status.overallStatus}`);
@@ -908,16 +1004,7 @@ function renderBudgets() {
     const head = createElement('div', 'budget-card-head');
     head.append(createElement('span', 'budget-card-title', item.category));
 
-    let statusText = `${item.percent}%`;
-    if (item.status === 'exceeded') {
-      statusText = `Melebihi (+${formatRupiah(Math.abs(item.remaining))})`;
-    } else if (item.status === 'warning') {
-      statusText = `Waspada (${item.percent}%)`;
-    } else {
-      statusText = `Aman (${item.percent}%)`;
-    }
-
-    const badge = createElement('span', `budget-card-status budget-status-${item.status}`, statusText);
+    const badge = createElement('span', `budget-card-status budget-status-${item.status}`, item.statusText);
     head.append(badge);
 
     const itemProgress = createElement('div', 'progress');
@@ -926,10 +1013,17 @@ function renderBudgets() {
     itemProgress.append(itemBar);
 
     const details = createElement('div', 'budget-card-details');
-    details.append(
-      createElement('span', null, `${formatRupiah(item.spent)} dari ${formatRupiah(item.budget)}`),
-      createElement('span', null, item.remaining >= 0 ? `Sisa: ${formatRupiah(item.remaining)}` : `Lebih: ${formatRupiah(Math.abs(item.remaining))}`)
-    );
+    if (item.budget > 0) {
+      details.append(
+        createElement('span', null, `${formatRupiah(item.spent)} dari ${formatRupiah(item.budget)}`),
+        createElement('span', null, item.remaining > 0 ? `Kurang: ${formatRupiah(item.remaining)}` : 'Terpenuhi 100%')
+      );
+    } else {
+      details.append(
+        createElement('span', null, item.spent > 0 ? `Terpakai: ${formatRupiah(item.spent)}` : 'Belum ada pengeluaran'),
+        createElement('span', null, 'Fleksibel')
+      );
+    }
 
     card.append(head, itemProgress, details);
     grid.append(card);
@@ -944,16 +1038,25 @@ function openBudgetDialog() {
   const container = $('budget-rows-container');
   container.replaceChildren();
 
-  // Combine categories from transactions + currently budgeted categories
+  // Hanya ambil kategori dari transaksi pengeluaran (kategori pemasukan/celengan '-' diabaikan)
+  const expenseCategories = state.transactions
+    .filter((t) => t.type === 'expense')
+    .map((t) => t.category)
+    .filter((cat) => cat && cat !== '-' && cat !== 'Pendapatan');
+
+  const budgetCategories = Object.keys(budgets)
+    .filter((cat) => cat && cat !== '-' && cat !== 'Pendapatan');
+
   const categories = Array.from(new Set([
-    ...state.transactions.map((t) => t.category).filter(Boolean),
-    ...Object.keys(budgets),
+    ...expenseCategories,
+    ...budgetCategories,
   ])).sort((a, b) => a.localeCompare(b, CONFIG.LOCALE));
 
   if (!categories.length) categories.push('Makanan', 'Transportasi', 'Belanja');
 
   categories.forEach((cat) => {
-    container.append(createBudgetRow(cat, budgets[cat] || ''));
+    const val = budgets[cat];
+    container.append(createBudgetRow(cat, val !== undefined ? val : ''));
   });
 
   $('budget-form-error').hidden = true;
@@ -973,8 +1076,8 @@ function createBudgetRow(categoryName = '', amountVal = '') {
   amtInput.type = 'number';
   amtInput.min = '0';
   amtInput.step = '1000';
-  amtInput.placeholder = 'Target Rp (0 = hapus)';
-  amtInput.value = amountVal ? String(amountVal) : '';
+  amtInput.placeholder = 'Target Rp (opsional)';
+  amtInput.value = (amountVal !== '' && Number(amountVal) > 0) ? String(amountVal) : '';
   amtInput.dataset.field = 'amount';
 
   const removeBtn = createElement('button', 'btn btn-ghost btn-icon btn-sm');
@@ -998,9 +1101,10 @@ async function handleBudgetSubmit(event) {
     const catInput = row.querySelector('[data-field="category"]');
     const amtInput = row.querySelector('[data-field="amount"]');
     const cat = catInput ? catInput.value.trim() : '';
-    const amt = amtInput ? Math.trunc(Number(amtInput.value) || 0) : 0;
+    const amt = amtInput && amtInput.value.trim() !== '' ? Math.trunc(Number(amtInput.value) || 0) : 0;
 
-    if (cat && amt > 0) {
+    // Anggaran khusus pengeluaran (terima nominal >= 0, kosong = 0 fleksibel)
+    if (cat && cat !== '-' && cat !== 'Pendapatan' && amt >= 0) {
       newBudgets[cat] = amt;
     }
   }
@@ -1009,11 +1113,12 @@ async function handleBudgetSubmit(event) {
   saveBudgets(userId, newBudgets);
   closeDialog($('budget-dialog'));
   renderBudgets();
+  updateTxnCategoryOptions();
 
   if (navigator.onLine) {
     try {
       await api('saveBudgets', { token: state.session.token, budgets: newBudgets });
-      showToast('Target anggaran berhasil disimpan ke Google Spreadsheet.', 'success');
+      showToast('Target pemenuhan berhasil disimpan.', 'success');
     } catch (err) {
       if (isSessionExpiredError(err)) {
         expireSession();
@@ -1363,6 +1468,7 @@ function resetTxnForm() {
   $('txn-type').value = 'expense';
   $('txn-date').value = todayISO();
   hideTxnFormError();
+  updateTxnCategoryOptions();
   Array.from($('txn-form').elements).forEach((field) => field.removeAttribute('aria-invalid'));
 }
 
@@ -1374,12 +1480,13 @@ function openTransactionDialog(transaction) {
     $('txn-type').value = transaction.type;
     $('txn-date').value = transaction.date;
     $('txn-description').value = transaction.description;
-    $('txn-category').value = transaction.category;
     $('txn-amount').value = String(transaction.amount);
+    updateTxnCategoryOptions(transaction.type === 'expense' ? transaction.category : '');
     $('txn-dialog-title').textContent = 'Ubah transaksi';
     $('txn-dialog-description').textContent = 'Perbarui detail transaksi.';
     $('txn-submit').textContent = 'Simpan perubahan';
   } else {
+    updateTxnCategoryOptions();
     $('txn-dialog-title').textContent = 'Tambah transaksi';
     $('txn-dialog-description').textContent = 'Catat pemasukan atau pengeluaran baru.';
     $('txn-submit').textContent = 'Simpan';
@@ -1414,24 +1521,39 @@ function hideTxnFormError() {
 }
 
 function readTxnForm() {
+  const type = $('txn-type').value;
+  const rawCategory = type === 'expense' ? ($('txn-category').value.trim() || 'Lainnya') : '-';
   return {
     date: $('txn-date').value,
     description: $('txn-description').value.trim(),
-    category: $('txn-category').value.trim(),
+    category: rawCategory,
     amount: Number($('txn-amount').value),
-    type: $('txn-type').value,
+    type: type,
   };
 }
 
-function validateTxnForm(values) {
+function getAvailableBalance(excludeTxnId = null) {
+  let net = 0;
+  (state.transactions || []).forEach((t) => {
+    if (excludeTxnId && String(t.id) === String(excludeTxnId)) return;
+    const amt = Math.trunc(Number(t.amount) || 0);
+    if (t.type === 'income') net += amt;
+    else net -= amt;
+  });
+  return net;
+}
+
+function validateTxnForm(values, editingId = null) {
   if (!isValidISODate(values.date)) {
     return { message: 'Tanggal tidak valid.', field: $('txn-date') };
   }
   if (values.description.length < 1 || values.description.length > 120) {
     return { message: 'Deskripsi harus 1–120 karakter.', field: $('txn-description') };
   }
-  if (values.category.length < 1 || values.category.length > 40) {
-    return { message: 'Kategori harus 1–40 karakter.', field: $('txn-category') };
+  if (values.type === 'expense') {
+    if (!values.category || values.category.length < 1 || values.category.length > 40) {
+      return { message: 'Silakan pilih kategori anggaran pengeluaran.', field: $('txn-category') };
+    }
   }
   if (!Number.isSafeInteger(values.amount) || values.amount <= 0) {
     return { message: 'Jumlah harus berupa angka bulat lebih dari 0.', field: $('txn-amount') };
@@ -1439,6 +1561,26 @@ function validateTxnForm(values) {
   if (values.type !== 'income' && values.type !== 'expense') {
     return { message: 'Jenis transaksi tidak valid.', field: $('txn-type') };
   }
+
+  // Model Celengan: Pengeluaran tidak boleh melebihi sisa saldo kas (tidak boleh defisit)
+  if (values.type === 'expense') {
+    const available = getAvailableBalance(editingId);
+    if (values.amount > available) {
+      return {
+        message: 'Pengeluaran melebihi sisa saldo kas yang tersedia (' + formatRupiah(Math.max(0, available)) + ').',
+        field: $('txn-amount'),
+      };
+    }
+  } else if (values.type === 'income' && editingId) {
+    const balanceWithoutThis = getAvailableBalance(editingId);
+    if (balanceWithoutThis + values.amount < 0) {
+      return {
+        message: 'Pengurangan pemasukan ini akan membuat saldo kas menjadi negatif.',
+        field: $('txn-amount'),
+      };
+    }
+  }
+
   return null;
 }
 
@@ -1667,13 +1809,13 @@ async function handleTxnSubmit(event) {
   hideTxnFormError();
 
   const values = readTxnForm();
-  const problem = validateTxnForm(values);
+  const editingId = state.editingId;
+  const problem = validateTxnForm(values, editingId);
   if (problem) {
     showTxnFormError(problem.message, problem.field);
     return;
   }
 
-  const editingId = state.editingId;
   const userId = state.session.user.id;
 
   // Offline handler
@@ -1787,6 +1929,17 @@ async function handleDeleteConfirm() {
   const id = state.deletingId;
   if (!id) return;
   const userId = state.session.user.id;
+
+  const txnToDelete = state.transactions.find((txn) => txn.id === id);
+  if (txnToDelete && txnToDelete.type === 'income') {
+    const balanceWithoutThis = getAvailableBalance(id);
+    if (balanceWithoutThis < 0) {
+      showToast('Tidak dapat menghapus pemasukan ini karena saldo kas akan menjadi negatif (' + formatRupiah(balanceWithoutThis) + ').', 'error');
+      closeDialog($('delete-dialog'));
+      state.deletingId = null;
+      return;
+    }
+  }
 
   // Offline handler
   if (!navigator.onLine) {
@@ -1906,7 +2059,6 @@ function handleFilterChange() {
 
   renderSummary();
   renderCharts();
-  renderCategories();
   renderTransactions();
   renderScope();
 }
@@ -1931,7 +2083,6 @@ function clearFilters() {
   resetFilterControls();
   renderSummary();
   renderCharts();
-  renderCategories();
   renderTransactions();
   renderScope();
 }
@@ -2158,6 +2309,11 @@ function bindEvents() {
   $('add-button').addEventListener('click', () => openTransactionDialog(null));
   $('empty-add-button').addEventListener('click', () => openTransactionDialog(null));
 
+  // Toggle category field visibility and options when transaction type changes
+  $('txn-type').addEventListener('change', () => {
+    updateTxnCategoryOptions();
+  });
+
   $('txn-form').addEventListener('submit', handleTxnSubmit);
   $('txn-form').addEventListener('input', (event) => {
     event.target.removeAttribute('aria-invalid');
@@ -2317,7 +2473,7 @@ function runSelfTests() {
   check('total pemasukan', summary.totalIncome === 5000000);
   check('total pengeluaran', summary.totalExpenses === 35000);
   check('saldo bersih', summary.net === 4965000);
-  check('kategori terkelompok', summary.categories.length === 2);
+  check('kategori pengeluaran terkelompok', summary.categories.length === 1 && summary.categories[0].name === 'Makanan');
 
   // Budget calculations check
   const budgetSampleTxns = [
@@ -2330,8 +2486,8 @@ function runSelfTests() {
 
   check('anggaran total dihitung', budgetStatus.totalBudget === 1100000);
   check('anggaran terpakai dihitung', budgetStatus.totalSpent === 1020000);
-  check('makanan berstatus waspada (90%)', budgetStatus.items.find((i) => i.category === 'Makanan').status === 'warning');
-  check('transportasi berstatus exceeded (120%)', budgetStatus.items.find((i) => i.category === 'Transportasi').status === 'exceeded');
+  check('makanan berstatus sebagian (90%)', budgetStatus.items.find((i) => i.category === 'Makanan').status === 'partial');
+  check('transportasi berstatus terpenuhi / lunas (120%)', budgetStatus.items.find((i) => i.category === 'Transportasi').status === 'fulfilled');
 
   // Username validation check
   check('validasi username normal', /^[a-z0-9._-]{3,64}$/.test('budi_santoso'));
@@ -2347,6 +2503,36 @@ function runSelfTests() {
   check('offline queue mutation saveSetting valid', (function () {
     const q = [{ action: 'saveSetting', payload: { key: 'theme', value: 'dark' } }];
     return q[0].action === 'saveSetting' && q[0].payload.key === 'theme';
+  })());
+
+  // Form category logic tests
+  check('validasi transaksi pengeluaran wajib kategori', (function () {
+    const res = validateTxnForm({ date: '2026-11-22', description: 'Makan', category: '', amount: 10000, type: 'expense' });
+    return res && res.field === $('txn-category');
+  })());
+  check('validasi transaksi pemasukan tidak memerlukan input kategori', (function () {
+    const prev = state.transactions;
+    state.transactions = [{ id: 'inc1', amount: 5000000, type: 'income' }];
+    const res = validateTxnForm({ date: '2026-11-22', description: 'Gaji Bulanan', category: '-', amount: 5000000, type: 'income' });
+    state.transactions = prev;
+    return res === null;
+  })());
+  check('kategori bawaan Lainnya selalu tersedia', getBudgetCategories().includes('Lainnya'));
+
+  // Pengujian pemisahan kategori anggaran khusus pengeluaran (menolak '-' dan 'Pendapatan')
+  const budgetSampleWithIncome = { 'Makanan': 1000000, '-': 5000000, 'Pendapatan': 3000000, 'Sedekah': 0 };
+  const budgetCleanStatus = calculateBudgetStatus(budgetSampleTxns, budgetSampleWithIncome, '2026-11-15');
+  check('kategori pemasukan (-) tidak masuk ke perhitungan anggaran', !budgetCleanStatus.items.some((i) => i.category === '-' || i.category === 'Pendapatan'));
+  check('total anggaran mengabaikan kategori pemasukan', budgetCleanStatus.totalBudget === 1000000);
+  check('kategori tanpa nominal berstatus fleksibel', budgetCleanStatus.items.find((i) => i.category === 'Sedekah').status === 'flexible');
+
+  // Pengujian anti-defisit: pengeluaran tidak boleh melebihi pemasukan
+  check('validasi tolak pengeluaran melebihi sisa saldo kas', (function () {
+    const prev = state.transactions;
+    state.transactions = [{ id: 'inc1', amount: 100000, type: 'income' }];
+    const res = validateTxnForm({ date: '2026-11-22', description: 'Belanja Mewah', category: 'Lainnya', amount: 200000, type: 'expense' });
+    state.transactions = prev;
+    return res && res.field === $('txn-amount') && res.message.includes('Pengeluaran melebihi sisa saldo');
   })());
 
   console.table(results);

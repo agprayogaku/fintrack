@@ -148,7 +148,6 @@ For signed amounts, format the absolute value and prefix `+` or `−` manually t
 | Total income | Total pemasukan |
 | Total expenses | Total pengeluaran |
 | Net balance | Saldo bersih |
-| Category breakdown | Berdasarkan kategori |
 | All-time scope | Semua transaksi |
 | Filtered scope | Sesuai filter |
 | Add dialog title | Tambah transaksi |
@@ -158,7 +157,7 @@ For signed amounts, format the absolute value and prefix `+` or `−` manually t
 | Close dialog | Tutup |
 | Date | Tanggal |
 | Description | Deskripsi |
-| Category | Kategori |
+| Category | Kategori Anggaran (khusus pengeluaran) |
 | Amount | Jumlah |
 | Type | Jenis |
 | Income option | Pemasukan |
@@ -195,7 +194,7 @@ For signed amounts, format the absolute value and prefix `+` or `−` manually t
 | Offline action | Anda sedang offline. Sambungkan ke internet untuk memuat atau mengubah data. |
 | Invalid date | Tanggal tidak valid. |
 | Missing description | Deskripsi wajib diisi. |
-| Missing category | Kategori wajib diisi. |
+| Missing category | Kategori pengeluaran wajib dipilih. |
 | Invalid amount | Jumlah harus berupa angka bulat lebih dari 0. |
 | Generic server error | Terjadi kesalahan server. Silakan coba lagi. |
 
@@ -363,17 +362,25 @@ Routing notes:
 - Filters apply client-side for instant feedback.
 - Clear filters resets all filter controls.
 - If `from > to`, show a validation message and no results.
-- Category options are derived from existing transactions and sorted alphabetically.
+- Category options are derived from expense transactions and defined budget categories (plus fallback "Lainnya") and sorted alphabetically.
 - If the selected category no longer exists, reset to `Semua kategori`.
 
-### 8.5 Summary
+### 8.5 Summary, Celengan Model, & Target Pemenuhan
 
+- **Model Celengan untuk Pemasukan:** Pemasukan dicatat langsung ke saldo kas/rekening tanpa membebani pengguna untuk memilih alokasi kategori anggaran (kategori otomatis dicatat sebagai `-`).
+- **Kategori Anggaran Khusus Pengeluaran:** Pengeluaran wajib memilih kategori anggaran (yang disinkronkan dengan target pemenuhan atau opsi bawaan "Lainnya") agar pengeluaran terlacak dengan presisi.
+- **Target Pemenuhan / Pelunasan Kewajiban:** Kategori anggaran diperlakukan sebagai target pemenuhan bulanan (misal: Cicilan, Tagihan, Tabungan). Status kategori:
+  - *Perlu Dilunasi (0%)*: belum ada pengeluaran dicatat.
+  - *Sebagian (X%)*: sudah dicatat sebagian dari target.
+  - *Lunas / Terpenuhi*: target telah tercapai atau terlampaui.
+  - *Fleksibel*: kategori yang disimpan tanpa nominal target tetap dapat digunakan untuk mencatat pengeluaran.
+- **Anti-Defisit Kas:** Pengeluaran tidak boleh melebihi sisa saldo kas yang tersedia. Transaksi pengeluaran yang melebihi saldo kas ditolak secara otomatis di sisi antarmuka maupun backend spreadsheet.
 - Totals are calculated from the filtered transactions so the dashboard matches the visible list.
 - Show:
   - Total pemasukan
   - Total pengeluaran
   - Saldo bersih
-  - Per-category income and expense totals
+  - Per-category expense totals and budget fulfillment progress (visualized via Budget list and Donut chart; the redundant standalone "Berdasarkan Kategori" card was removed).
 - Use integer arithmetic; all amounts are whole rupiah.
 - The backend `getSummary` action returns the same shape and is available for API clients, but the PWA calculates summaries locally for instant filtering.
 

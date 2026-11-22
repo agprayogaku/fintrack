@@ -284,6 +284,8 @@ button {
 .input {
   display: block;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: var(--control-height);
   padding: 0 0.75rem;
   border: 1px solid var(--input);
@@ -292,6 +294,35 @@ button {
   color: var(--foreground);
   font-size: 1rem;
   transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+/* iOS Safari specific fixes for date/time and select inputs */
+input[type="date"].input {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: var(--control-height);
+  line-height: normal;
+  padding: 0 0.75rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  line-height: normal;
+  margin: 0;
+  padding: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  padding: 0;
+  margin: 0;
 }
 
 .input::placeholder {
@@ -843,14 +874,26 @@ button {
   white-space: nowrap;
 }
 
-.budget-status-normal {
+.budget-status-normal,
+.budget-status-fulfilled {
   background: color-mix(in oklab, var(--income) 15%, var(--card));
   color: var(--income);
 }
 
-.budget-status-warning {
+.budget-status-partial {
+  background: color-mix(in oklab, var(--primary) 15%, var(--card));
+  color: var(--primary);
+}
+
+.budget-status-warning,
+.budget-status-unfulfilled {
   background: oklch(0.92 0.09 75);
   color: oklch(0.42 0.16 65);
+}
+
+.budget-status-flexible {
+  background: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .budget-status-exceeded {
@@ -858,12 +901,22 @@ button {
   color: var(--destructive);
 }
 
-.budget-bar-normal {
+.budget-bar-normal,
+.budget-bar-fulfilled {
   background: var(--income);
 }
 
-.budget-bar-warning {
+.budget-bar-partial {
+  background: var(--primary);
+}
+
+.budget-bar-warning,
+.budget-bar-unfulfilled {
   background: oklch(0.68 0.18 65);
+}
+
+.budget-bar-flexible {
+  background: var(--muted-foreground);
 }
 
 .budget-bar-exceeded {
@@ -1382,7 +1435,8 @@ button {
   background: rgb(0 0 0 / 0.75);
 }
 
-[data-theme="dark"] .budget-status-warning {
+[data-theme="dark"] .budget-status-warning,
+[data-theme="dark"] .budget-status-unfulfilled {
   background: oklch(0.30 0.08 75);
   color: oklch(0.90 0.14 75);
 }
@@ -1430,7 +1484,8 @@ button {
     background: rgb(0 0 0 / 0.75);
   }
 
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .budget-status-warning {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .budget-status-warning,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .budget-status-unfulfilled {
     background: oklch(0.30 0.08 75);
     color: oklch(0.90 0.14 75);
   }
